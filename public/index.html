@@ -1,0 +1,3101 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>طاولة أونو 3D - ملتيبلاير محلي LAN</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+        body,
+        html {
+            background-color: #020305;
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+            touch-action: none;
+        }
+        .player-tag {
+            position: absolute;
+            transform: translate(-50%, -100%);
+            background: rgba(8, 11, 18, 0.92);
+            border: 1.5px solid rgba(255, 255, 255, 0.22);
+            border-radius: 12px;
+            padding: 4px 14px;
+            text-align: center;
+            color: #e6dfd5;
+            pointer-events: none;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.8);
+            transition: border-color 0.3s, box-shadow 0.3s;
+            z-index: 5;
+            backdrop-filter: blur(6px);
+        }
+        .player-tag.active-turn {
+            border-color: #00ff88;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.7);
+        }
+        .p-name {
+            display: block;
+            font-size: 13px;
+            font-weight: bold;
+        }
+        .p-count {
+            display: block;
+            font-size: 11px;
+            color: #9eb1c7;
+        }
+        #player-status-tag {
+            position: absolute;
+            bottom: 18px;
+            right: 20px;
+            background: rgba(8, 11, 18, 0.92);
+            border: 1.5px solid rgba(255, 255, 255, 0.22);
+            border-radius: 14px;
+            padding: 6px 18px;
+            color: #e6dfd5;
+            pointer-events: none;
+            z-index: 10;
+            text-align: center;
+            backdrop-filter: blur(6px);
+        }
+        #player-status-tag.active-turn {
+            border-color: #00ff88;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.6);
+        }
+        #action-toast {
+            position: absolute;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(8, 11, 18, 0.92);
+            border: 1.5px solid rgba(255, 255, 255, 0.18);
+            color: #00ff88;
+            font-size: 14px;
+            font-weight: bold;
+            padding: 8px 24px;
+            border-radius: 22px;
+            pointer-events: none;
+            z-index: 20;
+            backdrop-filter: blur(8px);
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+            max-width: 90vw;
+            text-overflow: ellipsis;
+            overflow: hidden;
+        }
+        #draw-btn {
+            position: absolute;
+            bottom: 22px;
+            left: 20px;
+            background: linear-gradient(135deg, #1b263b, #0d1b2a);
+            color: #e0e1dd;
+            border: 2px solid rgba(0, 255, 136, 0.55);
+            border-radius: 28px;
+            padding: 12px 26px;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.7), 0 0 14px rgba(0, 255, 136, 0.25);
+            z-index: 15;
+            transition: transform 0.15s, opacity 0.2s;
+            letter-spacing: 0.5px;
+        }
+        #draw-btn:active {
+            transform: scale(0.94);
+        }
+        #draw-btn:disabled {
+            opacity: 0.35;
+            border-color: rgba(255, 255, 255, 0.2);
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        #color-picker-modal {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(10, 12, 18, 0.96);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 24px;
+            padding: 22px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.95), 0 0 24px rgba(255, 255, 255, 0.18);
+            z-index: 60;
+            text-align: center;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            backdrop-filter: blur(12px);
+        }
+        #color-picker-modal h3 {
+            color: #fff;
+            font-size: 17px;
+            margin-bottom: 5px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+        .color-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .color-choice-btn {
+            width: 80px;
+            height: 80px;
+            border-radius: 18px;
+            border: 3px solid rgba(255, 255, 255, 0.35);
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+            transition: transform 0.15s, border-color 0.2s;
+            letter-spacing: 0.5px;
+        }
+        .color-choice-btn:hover {
+            border-color: #fff;
+        }
+        .color-choice-btn:active {
+            transform: scale(0.92);
+        }
+        #settings-btn {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: rgba(8, 11, 18, 0.85);
+            border: 1.5px solid rgba(255, 255, 255, 0.25);
+            color: #e6dfd5;
+            font-size: 19px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 55;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.7);
+        }
+        #settings-btn:active {
+            transform: scale(0.9);
+        }
+        #quality-modal {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(10, 12, 18, 0.97);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 24px;
+            padding: 22px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.95), 0 0 24px rgba(255, 255, 255, 0.18);
+            z-index: 70;
+            text-align: center;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 12px;
+            backdrop-filter: blur(12px);
+            width: 280px;
+        }
+        #quality-modal h3 {
+            color: #fff;
+            font-size: 17px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+        #quality-modal p {
+            color: #9eb1c7;
+            font-size: 11.5px;
+            margin-top: -6px;
+        }
+        .quality-btn {
+            padding: 12px 14px;
+            border-radius: 14px;
+            border: 2px solid rgba(255, 255, 255, 0.25);
+            background: linear-gradient(135deg, #1b263b, #0d1b2a);
+            color: #e0e1dd;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            text-align: right;
+            transition: transform 0.15s, border-color 0.2s;
+        }
+        .quality-btn:active {
+            transform: scale(0.96);
+        }
+        .quality-btn.active-quality {
+            border-color: #00ff88;
+            box-shadow: 0 0 14px rgba(0, 255, 136, 0.45);
+        }
+        #quality-close-btn {
+            margin-top: 4px;
+            padding: 10px;
+            border-radius: 14px;
+            border: 1.5px solid rgba(255, 255, 255, 0.2);
+            background: transparent;
+            color: #9eb1c7;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        /* Network Status Badge */
+        #net-status-badge {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(8, 11, 18, 0.85);
+            border: 1.5px solid rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            padding: 6px 14px;
+            font-size: 12px;
+            font-weight: bold;
+            color: #e0e1dd;
+            z-index: 55;
+            backdrop-filter: blur(8px);
+        }
+        .status-dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: #00ff88;
+            box-shadow: 0 0 8px #00ff88;
+        }
+        .status-dot.disconnected {
+            background: #e53935;
+            box-shadow: 0 0 8px #e53935;
+        }
+
+        /* -------------------------------------------------------------
+           Lobby Overlay & Screens (Responsive & Clean Glassmorphism)
+           ------------------------------------------------------------- */
+        #lobby-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(2, 4, 8, 0.90);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 90;
+            padding: 16px;
+        }
+
+        .lobby-card {
+            background: rgba(13, 18, 28, 0.96);
+            border: 2px solid rgba(255, 255, 255, 0.25);
+            border-radius: 24px;
+            padding: clamp(20px, 4vw, 28px);
+            width: 100%;
+            max-width: 440px;
+            max-height: 92vh;
+            overflow-y: auto;
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.9), 0 0 32px rgba(0, 255, 136, 0.12);
+            color: #f0f2f5;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .lobby-title {
+            font-size: clamp(20px, 4.5vw, 25px);
+            font-weight: 900;
+            color: #fff;
+            text-shadow: 0 2px 10px rgba(0, 255, 136, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .lobby-sub {
+            font-size: 13px;
+            color: #9eb1c7;
+            margin-top: -6px;
+            line-height: 1.4;
+        }
+
+        .lobby-input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            text-align: right;
+        }
+
+        .lobby-input-group label {
+            font-size: 12.5px;
+            font-weight: bold;
+            color: #b0c4de;
+        }
+
+        .lobby-input {
+            width: 100%;
+            padding: 12px 16px;
+            background: rgba(8, 11, 18, 0.88);
+            border: 1.5px solid rgba(255, 255, 255, 0.25);
+            border-radius: 14px;
+            color: #fff;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            text-align: center;
+        }
+        .lobby-input:focus {
+            border-color: #00ff88;
+            box-shadow: 0 0 12px rgba(0, 255, 136, 0.35);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #00b060, #007a40);
+            color: #fff;
+            border: none;
+            border-radius: 16px;
+            padding: 13px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 16px rgba(0, 176, 96, 0.4);
+            transition: transform 0.15s, opacity 0.2s;
+        }
+        .btn-primary:active {
+            transform: scale(0.96);
+        }
+        .btn-primary:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+            box-shadow: none;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #1e293b, #0f172a);
+            color: #e2e8f0;
+            border: 1.5px solid rgba(255, 255, 255, 0.25);
+            border-radius: 16px;
+            padding: 12px 20px;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.15s, border-color 0.2s;
+        }
+        .btn-secondary:active {
+            transform: scale(0.96);
+        }
+        .btn-secondary:hover {
+            border-color: #00ff88;
+        }
+
+        .btn-ghost {
+            background: transparent;
+            color: #9eb1c7;
+            border: 1.5px solid rgba(255, 255, 255, 0.2);
+            border-radius: 14px;
+            padding: 10px 16px;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: border-color 0.2s, color 0.2s;
+        }
+        .btn-ghost:hover {
+            border-color: #fff;
+            color: #fff;
+        }
+
+        .room-code-badge {
+            background: rgba(0, 255, 136, 0.12);
+            border: 2px dashed #00ff88;
+            border-radius: 16px;
+            padding: 10px 18px;
+            font-size: 26px;
+            font-weight: 900;
+            letter-spacing: 4px;
+            color: #00ff88;
+            cursor: pointer;
+            user-select: all;
+            display: inline-block;
+            transition: transform 0.15s;
+        }
+        .room-code-badge:active {
+            transform: scale(0.95);
+        }
+
+        .lan-info-box {
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: 14px;
+            padding: 10px 14px;
+            font-size: 12.5px;
+            color: #cbd5e1;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            text-align: right;
+        }
+        .lan-url {
+            font-family: monospace;
+            color: #38bdf8;
+            direction: ltr;
+            text-align: center;
+            background: rgba(0,0,0,0.4);
+            padding: 5px 10px;
+            border-radius: 8px;
+            word-break: break-all;
+            user-select: all;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .lobby-player-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 160px;
+            overflow-y: auto;
+            padding: 2px;
+        }
+        .lobby-player-item {
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            padding: 8px 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+            color: #f1f5f9;
+        }
+        .lobby-player-item.is-host {
+            border-color: rgba(245, 158, 11, 0.6);
+        }
+        .badge-host {
+            background: rgba(245, 158, 11, 0.2);
+            color: #f59e0b;
+            border-radius: 8px;
+            padding: 2px 8px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        .badge-you {
+            background: rgba(0, 255, 136, 0.2);
+            color: #00ff88;
+            border-radius: 8px;
+            padding: 2px 8px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .host-options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            text-align: right;
+            background: rgba(15, 23, 42, 0.6);
+            padding: 12px;
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+        .toggle-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+        }
+        .seat-selector {
+            display: flex;
+            gap: 6px;
+            justify-content: center;
+            margin-top: 4px;
+        }
+        .seat-btn {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            background: rgba(8, 11, 18, 0.9);
+            border: 1.5px solid rgba(255, 255, 255, 0.25);
+            color: #fff;
+            font-weight: bold;
+            font-size: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+        }
+        .seat-btn.selected {
+            border-color: #00ff88;
+            background: rgba(0, 255, 136, 0.2);
+            color: #00ff88;
+        }
+
+        /* Confirmation & Game Over Modals */
+        #leave-confirm-modal, #game-over-modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(10, 13, 20, 0.97);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 24px;
+            padding: 24px;
+            box-shadow: 0 12px 48px rgba(0, 0, 0, 0.95);
+            z-index: 150;
+            text-align: center;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            backdrop-filter: blur(16px);
+            width: min(90vw, 360px);
+            color: #fff;
+        }
+        #leave-confirm-modal h3, #game-over-modal h3 {
+            font-size: 19px;
+            font-weight: bold;
+        }
+        #leave-confirm-modal p, #game-over-modal p {
+            font-size: 13.5px;
+            color: #9eb1c7;
+            line-height: 1.4;
+        }
+        .modal-btn-row {
+            display: flex;
+            gap: 12px;
+            width: 100%;
+            justify-content: center;
+        }
+        .modal-btn-row button {
+            flex: 1;
+            padding: 12px 14px;
+            border-radius: 14px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+    <div id="net-status-badge">
+        <span class="status-dot" id="net-dot"></span>
+        <span id="net-status-text">جاري الاتصال...</span>
+    </div>
+
+    <button id="settings-btn" title="الإعدادات">⚙️</button>
+
+    <div id="action-toast">مرحباً بك في أونو 3D LAN</div>
+
+    <div id="opponent-tags-container"></div>
+
+    <div id="player-status-tag" style="display:none;">
+        <span class="p-name" id="my-player-name">أنت</span>
+        <span class="p-count" id="player-count">7 كروت</span>
+    </div>
+
+    <button id="draw-btn" style="display:none;">سحب ورقة 🎴</button>
+
+    <!-- Modal Color Picker for Wild -->
+    <div id="color-picker-modal">
+        <h3>اختر اللون الجديد</h3>
+        <div class="color-grid">
+            <div class="color-choice-btn" style="background:#C62828;" data-color="red" data-hex="#C62828">أحمر</div>
+            <div class="color-choice-btn" style="background:#1565C0;" data-color="blue" data-hex="#1565C0">أزرق</div>
+            <div class="color-choice-btn" style="background:#2E7D32;" data-color="green" data-hex="#2E7D32">أخضر</div>
+            <div class="color-choice-btn" style="background:#F9A825; color:#111;" data-color="yellow" data-hex="#F9A825">أصفر</div>
+        </div>
+    </div>
+
+    <!-- Modal Quality Settings -->
+    <div id="quality-modal">
+        <h3>جودة الرسومات</h3>
+        <p>الجودة المنخفضة تلغي الظلال وتوفر أقصى سلاسة للهواتف الضعيفة. تغيير الجودة يعيد تشغيل الصفحة.</p>
+        <div class="quality-btn" data-q="high">عالية (أفضل مظهر)</div>
+        <div class="quality-btn" data-q="medium">متوسطة</div>
+        <div class="quality-btn" data-q="low">منخفضة (أقصى سلاسة)</div>
+        <button id="quality-close-btn">إغلاق</button>
+    </div>
+
+    <!-- Modal Back Button Confirm -->
+    <div id="leave-confirm-modal">
+        <h3>مغادرة اللعبة؟</h3>
+        <p>اللعبة جارية حالياً! إذا غادرت ستفقد تقدمك وسيعوضك بوت لإكمال اللعب مع أصدقائك.</p>
+        <div class="modal-btn-row">
+            <button id="confirm-leave-btn" style="background:#b91c1c; color:#fff; border:none;">نعم، مغادرة</button>
+            <button id="cancel-leave-btn" style="background:#1e293b; color:#fff; border:1.5px solid rgba(255,255,255,0.2);">إلغاء</button>
+        </div>
+    </div>
+
+    <!-- Modal Game Over -->
+    <div id="game-over-modal">
+        <div style="font-size:40px;">🏆</div>
+        <h3 id="game-over-title">انتهت اللعبة!</h3>
+        <p id="game-over-desc">فاز اللاعب ...</p>
+        <div class="modal-btn-row">
+            <button id="game-over-ok-btn" class="btn-primary" style="width:100%;">العودة للوبي</button>
+        </div>
+    </div>
+
+    <!-- -------------------------------------------------------------
+         LOBBY OVERLAY (Glassmorphic, Responsive)
+         ------------------------------------------------------------- -->
+    <div id="lobby-overlay">
+        <!-- 1. Main Welcome Screen -->
+        <div class="lobby-card" id="screen-main">
+            <div class="lobby-title">🎴 أونو 3D - شبكة LAN</div>
+            <div class="lobby-sub">العب مع أصدقائك عبر شبكة الواي فاي المحلية مباشرة من المتصفح وبدون إنترنت!</div>
+
+            <div class="lobby-input-group">
+                <label for="input-nickname">اسمك المستعار (Nickname):</label>
+                <input type="text" id="input-nickname" class="lobby-input" placeholder="مثال: ضياء" maxlength="15">
+            </div>
+
+            <button class="btn-primary" id="btn-goto-host">🎮 إنشاء غرفة جديدة (Host)</button>
+            <button class="btn-secondary" id="btn-goto-join">🔗 الانضمام إلى غرفة (Join)</button>
+            <button class="btn-secondary" id="btn-goto-solo" style="background: linear-gradient(135deg, #4f46e5, #312e81); border-color: rgba(99,102,241,0.5);">🤖 العب وحدك ضد البوتات (Solo)</button>
+
+            <div class="lan-info-box" id="server-ip-info">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span>📍 عنوان السيرفر (IP):</span>
+                    <span id="btn-edit-ip" style="color:#00ff88; cursor:pointer; font-size:12px; font-weight:bold;">تعديل ✏️</span>
+                </div>
+                <span class="lan-url" id="server-ip-text">جاري جلب الـ IP...</span>
+                <div id="ip-edit-container" style="display:none; margin-top:6px; flex-direction:column; gap:6px;">
+                    <input type="text" id="input-custom-ip" class="lobby-input" style="font-size:13px; padding:6px 10px;" placeholder="192.168.1.XX:3000">
+                    <button class="btn-primary" id="btn-save-custom-ip" style="padding:8px 12px; font-size:13px;">حفظ وتوصيل</button>
+                </div>
+            </div>
+        </div>
+
+        
+        <!-- 1.B Solo Game Screen -->
+        <div class="lobby-card" id="screen-solo" style="display:none;">
+            <div class="lobby-title">العب ضد البوتات 🤖</div>
+            <div class="lobby-sub">العب بمفردك فوراً ضد الذكاء الاصطناعي وبدون الحاجة لانتظار أي لاعب آخر!</div>
+
+            <div class="host-options">
+                <div class="toggle-row">
+                    <span>إجمالي اللاعبين على الطاولة (أنت + بوتات):</span>
+                </div>
+                <div class="seat-selector" id="solo-seat-selector">
+                    <div class="seat-btn" data-seats="2">2</div>
+                    <div class="seat-btn" data-seats="3">3</div>
+                    <div class="seat-btn selected" data-seats="4">4</div>
+                    <div class="seat-btn" data-seats="5">5</div>
+                    <div class="seat-btn" data-seats="6">6</div>
+                    <div class="seat-btn" data-seats="7">7</div>
+                    <div class="seat-btn" data-seats="8">8</div>
+                </div>
+                <div style="font-size:12px; color:#9eb1c7; text-align:center; margin-top:6px;" id="solo-summary-text">
+                    أنت + 3 بوتات (المجموع: 4 لاعبين)
+                </div>
+            </div>
+
+            <button class="btn-primary" id="btn-start-solo">🚀 ابدأ اللعب فوراً</button>
+            <button class="btn-ghost" id="btn-solo-back">رجوع للرئيسية</button>
+        </div>
+
+        <!-- 2. Host Room Lobby -->
+        <div class="lobby-card" id="screen-host" style="display:none;">
+            <div class="lobby-title">غرفة اللعب 👑</div>
+            <div class="lobby-sub">شارك كود الغرفة وعنوان الشبكة مع أصدقائك:</div>
+
+            <div>
+                <span class="room-code-badge" id="host-room-code" title="اضغط للنسخ">----</span>
+                <div style="font-size:11px; color:#9eb1c7; margin-top:4px;">كود الغرفة</div>
+            </div>
+
+            <div class="lan-info-box">
+                <span>📲 رابط الدخول من هواتف الأصدقاء:</span>
+                <span class="lan-url" id="host-lan-url">جاري الجلب...</span>
+            </div>
+
+            <div class="host-options">
+                <div class="toggle-row">
+                    <label for="chk-fill-bots" style="cursor:pointer;">ملء المقاعد المتبقية ببوتات:</label>
+                    <input type="checkbox" id="chk-fill-bots" checked style="width:18px; height:18px; cursor:pointer;">
+                </div>
+                <div class="toggle-row">
+                    <span>إجمالي اللاعبين على الطاولة:</span>
+                </div>
+                <div class="seat-selector" id="seat-selector">
+                    <div class="seat-btn" data-seats="2">2</div>
+                    <div class="seat-btn" data-seats="3">3</div>
+                    <div class="seat-btn selected" data-seats="4">4</div>
+                    <div class="seat-btn" data-seats="5">5</div>
+                    <div class="seat-btn" data-seats="6">6</div>
+                    <div class="seat-btn" data-seats="7">7</div>
+                    <div class="seat-btn" data-seats="8">8</div>
+                </div>
+            </div>
+
+            <div style="text-align:right; font-size:13px; font-weight:bold; color:#b0c4de;">
+                اللاعبون في الغرفة (<span id="host-player-count">1</span>):
+            </div>
+            <div class="lobby-player-list" id="host-player-list"></div>
+
+            <button class="btn-primary" id="btn-start-game">🚀 ابدأ اللعبة الآن</button>
+            <button class="btn-ghost" id="btn-host-leave">إلغاء الغرفة</button>
+        </div>
+
+        <!-- 3. Join Room Screen -->
+        <div class="lobby-card" id="screen-join" style="display:none;">
+            <div class="lobby-title">الانضمام إلى غرفة 🚪</div>
+            <div class="lobby-sub">أدخل كود الغرفة المكون من 4 خانات:</div>
+
+            <div class="lobby-input-group">
+                <label for="input-room-code">كود الغرفة (Room Code):</label>
+                <input type="text" id="input-room-code" class="lobby-input" placeholder="مثال: 4821" maxlength="6" style="text-transform:uppercase; letter-spacing:3px;">
+            </div>
+
+            <button class="btn-primary" id="btn-do-join">دخول الغرفة</button>
+            <button class="btn-ghost" id="btn-join-back">رجوع</button>
+        </div>
+
+        <!-- 4. Guest Waiting Room Screen -->
+        <div class="lobby-card" id="screen-waiting" style="display:none;">
+            <div class="lobby-title">في انتظار المضيف ⏳</div>
+            <div class="lobby-sub">أنت الآن في الغرفة: <b id="wait-room-code" style="color:#00ff88;">----</b></div>
+
+            <div style="text-align:right; font-size:13px; font-weight:bold; color:#b0c4de;">
+                اللاعبون المتصلون (<span id="wait-player-count">0</span>):
+            </div>
+            <div class="lobby-player-list" id="wait-player-list"></div>
+
+            <div style="padding:10px; font-size:13px; color:#9eb1c7; background:rgba(15,23,42,0.6); border-radius:12px;">
+                ستبدأ اللعبة تلقائياً فور ضغط المضيف على زر البدء...
+            </div>
+
+            <button class="btn-ghost" id="btn-wait-leave">مغادرة الغرفة</button>
+        </div>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <script>
+        // ================================================
+        // 0. إعدادات الجودة ونظام Three.js الأصلي 100%
+        // ================================================
+        const QCFG = {
+            low: { shadows: false, antialias: false, pixelRatioCap: 1, smoke: 0, softShadow: false, shadowMapSize: 512, tone: false, fog: false, bob: false, pulseGlow: false, extraLights: false },
+            medium: { shadows: true, antialias: true, pixelRatioCap: 1.4, smoke: 30, softShadow: false, shadowMapSize: 1024, tone: true, fog: true, bob: true, pulseGlow: false, extraLights: true },
+            high: { shadows: true, antialias: true, pixelRatioCap: 2, smoke: 100, softShadow: true, shadowMapSize: 2048, tone: true, fog: true, bob: true, pulseGlow: true, extraLights: true }
+        };
+        let currentQuality = localStorage.getItem("uno3d_quality") || "high";
+        if (!QCFG[currentQuality]) currentQuality = "high";
+        const Q = QCFG[currentQuality];
+
+        // 1. المشهد والكاميرا والإضاءة المحسنة
+        const scene = new THREE.Scene();
+        const fogColor = 0x04060a;
+        scene.background = new THREE.Color(fogColor);
+        if (Q.fog) scene.fog = new THREE.FogExp2(fogColor, 0.04);
+
+        const camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(0, 1.65, 2.15);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: Q.antialias, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, Q.pixelRatioCap));
+        renderer.shadowMap.enabled = Q.shadows;
+        renderer.shadowMap.type = Q.softShadow ? THREE.PCFSoftShadowMap : THREE.BasicShadowMap;
+        renderer.toneMapping = Q.tone ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping;
+        renderer.toneMappingExposure = Q.tone ? 1.2 : 1.0;
+        document.getElementById("canvas-container").appendChild(renderer.domElement);
+
+        const ambientLight = new THREE.AmbientLight(0x4a5466, 1.7);
+        scene.add(ambientLight);
+
+        const mainLight = new THREE.SpotLight(0xfff5e8, 1.3);
+        mainLight.position.set(0, 4.35, 0.35);
+        mainLight.angle = Math.PI / 2.5;
+        mainLight.penumbra = 0.4;
+        mainLight.castShadow = Q.shadows;
+        mainLight.shadow.mapSize.width = Q.shadowMapSize;
+        mainLight.shadow.mapSize.height = Q.shadowMapSize;
+        mainLight.shadow.bias = -0.0001;
+        scene.add(mainLight);
+
+        const centerSpot = new THREE.SpotLight(0xffffff, 1.1);
+        centerSpot.position.set(0, 3.2, 0.6);
+        centerSpot.angle = Math.PI / 5;
+        centerSpot.penumbra = 0.25;
+        centerSpot.decay = 1.5;
+        centerSpot.distance = 8;
+        centerSpot.castShadow = false;
+        scene.add(centerSpot);
+        centerSpot.target.position.set(0, 0.42, 0);
+        scene.add(centerSpot.target);
+
+        if (Q.extraLights) {
+            const fillLight = new THREE.PointLight(0x3a5a8c, 1.8, 12);
+            fillLight.position.set(0, 4, -1.5);
+            scene.add(fillLight);
+
+            const rimLight = new THREE.PointLight(0x5588aa, 1.2, 10);
+            rimLight.position.set(-2, 2.5, 1.5);
+            scene.add(rimLight);
+        }
+
+        // مصباح سقفي مرئي
+        function createCeilingLamp() {
+            const grp = new THREE.Group();
+            grp.position.set(0, 4.35, 0.25);
+            const wireGeo = new THREE.CylinderGeometry(0.014, 0.014, 1.6, 8);
+            const wireMat = new THREE.MeshStandardMaterial({ color: 0x181818, roughness: 0.6 });
+            const wire = new THREE.Mesh(wireGeo, wireMat);
+            wire.position.y = 0.95;
+            grp.add(wire);
+
+            const shadeGeo = new THREE.CylinderGeometry(0.58, 0.24, 0.4, 32, 1, true);
+            const shadeMat = new THREE.MeshStandardMaterial({
+                color: 0x3d3d3d,
+                roughness: 0.4,
+                metalness: 0.35,
+                side: THREE.DoubleSide
+            });
+            const shade = new THREE.Mesh(shadeGeo, shadeMat);
+            grp.add(shade);
+
+            const innerGeo = new THREE.CircleGeometry(0.22, 32);
+            const innerMat = new THREE.MeshStandardMaterial({ color: 0xe8e4d8, roughness: 0.6, side: THREE.DoubleSide });
+            const inner = new THREE.Mesh(innerGeo, innerMat);
+            inner.rotation.x = Math.PI / 2;
+            inner.position.y = 0.19;
+            grp.add(inner);
+
+            const bulbGeo = new THREE.SphereGeometry(0.15, 24, 24);
+            const bulbMat = new THREE.MeshStandardMaterial({
+                color: 0xfff8e6,
+                emissive: 0xfff2cf,
+                emissiveIntensity: 2.6,
+                roughness: 0.3
+            });
+            const bulb = new THREE.Mesh(bulbGeo, bulbMat);
+            bulb.position.y = -0.12;
+            grp.add(bulb);
+
+            scene.add(grp);
+            return grp;
+        }
+        createCeilingLamp();
+
+        // 2. الطاولة
+        const tableGroup = new THREE.Group();
+        tableGroup.position.set(0, 0.35, 0);
+
+        const topGeo = new THREE.CylinderGeometry(2.3, 2.3, 0.1, 64);
+        const topMat = new THREE.MeshStandardMaterial({ color: 0x0d1f16, roughness: 0.5, metalness: 0.08 });
+        const tableTop = new THREE.Mesh(topGeo, topMat);
+        tableTop.receiveShadow = Q.shadows;
+        tableGroup.add(tableTop);
+
+        const rimGeo = new THREE.TorusGeometry(2.3, 0.09, 16, 64);
+        const woodMat = new THREE.MeshStandardMaterial({ color: 0x1a0f0a, roughness: 0.35, metalness: 0.1 });
+        const tableRim = new THREE.Mesh(rimGeo, woodMat);
+        tableRim.rotation.x = Math.PI / 2;
+        tableRim.position.y = 0.055;
+        tableGroup.add(tableRim);
+
+        const baseGeo = new THREE.CylinderGeometry(0.5, 0.8, 0.7, 32);
+        const baseMesh = new THREE.Mesh(baseGeo, woodMat);
+        baseMesh.position.y = -0.4;
+        tableGroup.add(baseMesh);
+        scene.add(tableGroup);
+
+        const floorGeo = new THREE.PlaneGeometry(30, 30);
+        const floorMat = new THREE.MeshStandardMaterial({ color: 0x030406, roughness: 0.85 });
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        floor.position.y = -0.4;
+        scene.add(floor);
+
+        // 3. جزيئات الدخان
+        function createSmokeParticleTexture() {
+            const cv = document.createElement("canvas");
+            cv.width = 128;
+            cv.height = 128;
+            const ctx = cv.getContext("2d");
+            const grad = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+            grad.addColorStop(0, "rgba(95, 120, 150, 0.65)");
+            grad.addColorStop(0.4, "rgba(55, 75, 100, 0.25)");
+            grad.addColorStop(1, "rgba(0, 0, 0, 0)");
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, 128, 128);
+            return new THREE.CanvasTexture(cv);
+        }
+
+        if (Q.smoke > 0) {
+            const smokeCount = Q.smoke;
+            const smokeGeo = new THREE.BufferGeometry();
+            const smokePos = new Float32Array(smokeCount * 3);
+            for (let i = 0; i < smokeCount * 3; i += 3) {
+                smokePos[i] = (Math.random() - 0.5) * 14;
+                smokePos[i + 1] = Math.random() * 4.5 + 0.5;
+                smokePos[i + 2] = (Math.random() - 0.5) * 14;
+            }
+            smokeGeo.setAttribute('position', new THREE.BufferAttribute(smokePos, 3));
+            const smokeMat = new THREE.PointsMaterial({
+                map: createSmokeParticleTexture(),
+                size: 1.3,
+                transparent: true,
+                opacity: 0.3,
+                depthWrite: false
+            });
+            scene.add(new THREE.Points(smokeGeo, smokeMat));
+        }
+
+        // ================================================
+        // 4. نظام الكروت الاحترافي
+        // ================================================
+        const PROF_COLORS = {
+            red: { base: '#C62828', dark: '#8E1818', light: '#E53935', ar: 'أحمر' },
+            blue: { base: '#1565C0', dark: '#0D47A1', light: '#1E88E5', ar: 'أزرق' },
+            green: { base: '#2E7D32', dark: '#1B5E20', light: '#43A047', ar: 'أخضر' },
+            yellow: { base: '#F9A825', dark: '#F57F17', light: '#FBC02D', ar: 'أصفر' },
+            wild: { base: '#212121', dark: '#111111', light: '#333333', ar: 'وايلد' }
+        };
+
+        function drawSkipIcon(ctx, cx, cy, size, color) {
+            const r = size * 0.38;
+            ctx.strokeStyle = color;
+            ctx.lineWidth = size * 0.14;
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.stroke();
+            const diag = size * 0.55;
+            ctx.beginPath();
+            ctx.moveTo(cx - diag * 0.7, cy - diag * 0.7);
+            ctx.lineTo(cx + diag * 0.7, cy + diag * 0.7);
+            ctx.stroke();
+        }
+
+        function drawReverseIcon(ctx, cx, cy, size, color) {
+            ctx.strokeStyle = color;
+            ctx.fillStyle = color;
+            ctx.lineWidth = size * 0.12;
+            const r = size * 0.32;
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, Math.PI * 0.9, Math.PI * 0.1);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(cx + r * 0.85, cy - r * 0.55);
+            ctx.lineTo(cx + r * 1.4, cy - r * 0.05);
+            ctx.lineTo(cx + r * 0.75, cy + r * 0.35);
+            ctx.closePath();
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, Math.PI * 1.9, Math.PI * 1.1);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(cx - r * 0.85, cy + r * 0.55);
+            ctx.lineTo(cx - r * 1.4, cy + r * 0.05);
+            ctx.lineTo(cx - r * 0.75, cy - r * 0.35);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        function drawDraw2Icon(ctx, cx, cy, size, cardColor, textColor) {
+            const cw = size * 0.38;
+            const ch = size * 0.52;
+            ctx.fillStyle = cardColor;
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = size * 0.06;
+            ctx.beginPath();
+            ctx.roundRect(cx - cw * 0.75, cy - ch * 0.55, cw, ch, size * 0.08);
+            ctx.fill();
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.roundRect(cx - cw * 0.25, cy - ch * 0.25, cw, ch, size * 0.08);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = textColor;
+            ctx.font = `bold ${size * 0.38}px 'Arial Black', Impact, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('+2', cx + cw * 0.15, cy + ch * 0.1);
+        }
+
+        function drawWildIcon(ctx, cx, cy, size, alpha) {
+            const r = size * 0.42;
+            const colors = ['#1565C0', '#2E7D32', '#F9A825', '#C62828'];
+            for (let i = 0; i < 4; i++) {
+                const startAngle = (i * Math.PI) / 2 - Math.PI / 4;
+                const endAngle = ((i + 1) * Math.PI) / 2 - Math.PI / 4;
+                ctx.globalAlpha = alpha || 1;
+                ctx.fillStyle = colors[i];
+                ctx.beginPath();
+                ctx.moveTo(cx, cy);
+                ctx.arc(cx, cy, r, startAngle, endAngle);
+                ctx.closePath();
+                ctx.fill();
+            }
+            ctx.globalAlpha = 1;
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = size * 0.04;
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(cx, cy, size * 0.12, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function drawWild4Icon(ctx, cx, cy, size) {
+            drawWildIcon(ctx, cx, cy, size, 1);
+            const cw = size * 0.3;
+            const ch = size * 0.42;
+            ctx.fillStyle = '#fff';
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = size * 0.04;
+            ctx.beginPath();
+            ctx.roundRect(cx - cw * 0.9, cy - ch * 0.6, cw, ch, size * 0.06);
+            ctx.fill();
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.roundRect(cx - cw * 0.3, cy - ch * 0.3, cw, ch, size * 0.06);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = '#212121';
+            ctx.font = `bold ${size * 0.32}px 'Arial Black', Impact, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('+4', cx + cw * 0.05, cy + ch * 0.15);
+        }
+
+        function createProfessionalCardTex(val, colorHex, isWild = false, cardType = 'number') {
+            const cv = document.createElement("canvas");
+            cv.width = 512;
+            cv.height = 768;
+            const c = cv.getContext("2d");
+
+            let baseColor, darkColor, lightColor;
+            if (isWild) {
+                baseColor = PROF_COLORS.wild.base;
+                darkColor = PROF_COLORS.wild.dark;
+                lightColor = PROF_COLORS.wild.light;
+            } else {
+                for (const key in PROF_COLORS) {
+                    if (PROF_COLORS[key].base === colorHex || PROF_COLORS[key].light === colorHex ||
+                        PROF_COLORS[key].dark === colorHex) {
+                        baseColor = PROF_COLORS[key].base;
+                        darkColor = PROF_COLORS[key].dark;
+                        lightColor = PROF_COLORS[key].light;
+                        break;
+                    }
+                }
+                if (!baseColor) {
+                    baseColor = colorHex;
+                    darkColor = colorHex;
+                    lightColor = colorHex;
+                }
+            }
+
+            c.fillStyle = '#ffffff';
+            c.fillRect(0, 0, 512, 768);
+
+            const padding = 14;
+            const innerX = padding;
+            const innerY = padding;
+            const innerW = 512 - padding * 2;
+            const innerH = 768 - padding * 2;
+
+            c.save();
+            c.shadowColor = 'rgba(0,0,0,0.35)';
+            c.shadowBlur = 18;
+            c.shadowOffsetX = 2;
+            c.shadowOffsetY = 4;
+            c.fillStyle = baseColor;
+            c.beginPath();
+            c.roundRect(innerX, innerY, innerW, innerH, 6);
+            c.fill();
+            c.restore();
+
+            const grad = c.createLinearGradient(innerX, innerY, innerX + innerW, innerY + innerH);
+            grad.addColorStop(0, lightColor);
+            grad.addColorStop(0.5, baseColor);
+            grad.addColorStop(1, darkColor);
+            c.fillStyle = grad;
+            c.beginPath();
+            c.roundRect(innerX, innerY, innerW, innerH, 6);
+            c.fill();
+
+            if (!isWild) {
+                c.save();
+                c.translate(256, 384);
+                c.rotate(-Math.PI / 10);
+                const shapeW = innerW * 0.78;
+                const shapeH = innerH * 0.56;
+                c.shadowColor = 'rgba(0,0,0,0.2)';
+                c.shadowBlur = 20;
+                c.shadowOffsetX = 4;
+                c.shadowOffsetY = 6;
+                c.fillStyle = '#F8F9FA';
+                c.beginPath();
+                c.roundRect(-shapeW / 2, -shapeH / 2, shapeW, shapeH, 28);
+                c.fill();
+                c.restore();
+
+                c.save();
+                c.translate(256, 384);
+                c.rotate(-Math.PI / 10);
+                c.strokeStyle = 'rgba(0,0,0,0.08)';
+                c.lineWidth = 2;
+                c.beginPath();
+                c.roundRect(-shapeW / 2, -shapeH / 2, shapeW, shapeH, 28);
+                c.stroke();
+                c.restore();
+            }
+
+            if (isWild) {
+                if (cardType === 'wild4' || val === '+4') {
+                    drawWild4Icon(c, 256, 384, 180);
+                } else {
+                    drawWildIcon(c, 256, 384, 180, 1);
+                }
+            } else if (cardType === 'skip' || val === '🚫') {
+                drawSkipIcon(c, 256, 384, 170, baseColor);
+            } else if (cardType === 'reverse' || val === '🔄') {
+                drawReverseIcon(c, 256, 384, 170, baseColor);
+            } else if (cardType === 'draw2' || val === '+2') {
+                drawDraw2Icon(c, 256, 384, 170, baseColor, '#ffffff');
+            } else {
+                const displayVal = val;
+                const fontSize = displayVal.length > 2 ? 190 : 230;
+                c.fillStyle = baseColor;
+                c.font = `bold ${fontSize}px 'Arial Black', Impact, sans-serif`;
+                c.textAlign = 'center';
+                c.textBaseline = 'middle';
+                c.shadowColor = 'rgba(0,0,0,0.15)';
+                c.shadowBlur = 8;
+                c.shadowOffsetX = 2;
+                c.shadowOffsetY = 3;
+                const isSixNine = displayVal === '6' || displayVal === '9';
+                if (isSixNine) {
+                    c.fillText(displayVal, 256, 384);
+                    c.strokeStyle = baseColor;
+                    c.lineWidth = 5;
+                    const lineY = 384 + fontSize * 0.38;
+                    c.beginPath();
+                    c.moveTo(256 - fontSize * 0.3, lineY);
+                    c.lineTo(256 + fontSize * 0.3, lineY);
+                    c.stroke();
+                } else {
+                    c.fillText(displayVal, 256, 384);
+                }
+                c.shadowColor = 'transparent';
+                c.shadowBlur = 0;
+            }
+
+            if (!isWild) {
+                c.save();
+                c.fillStyle = '#ffffff';
+                c.font = `bold 64px 'Arial Black', Impact, sans-serif`;
+                c.textAlign = 'left';
+                c.textBaseline = 'top';
+                c.shadowColor = 'rgba(0,0,0,0.5)';
+                c.shadowBlur = 6;
+                c.shadowOffsetX = 1;
+                c.shadowOffsetY = 2;
+
+                if (cardType === 'number') {
+                    c.fillText(val, 38, 30);
+                    if (val === '6' || val === '9') {
+                        c.strokeStyle = '#ffffff';
+                        c.lineWidth = 3;
+                        c.beginPath();
+                        c.moveTo(38, 30 + 64 + 8);
+                        c.lineTo(38 + 52, 30 + 64 + 8);
+                        c.stroke();
+                    }
+                } else if (cardType === 'skip') {
+                    const smallSize = 52;
+                    const smallR = smallSize * 0.35;
+                    c.strokeStyle = '#ffffff';
+                    c.lineWidth = smallSize * 0.16;
+                    c.beginPath();
+                    c.arc(38 + smallR + 10, 30 + smallR + 10, smallR, 0, Math.PI * 2);
+                    c.stroke();
+                    c.beginPath();
+                    c.moveTo(38 + 10, 30 + 10);
+                    c.lineTo(38 + smallR * 2 + 10, 30 + smallR * 2 + 10);
+                    c.stroke();
+                } else if (cardType === 'reverse') {
+                    c.font = `bold 56px 'Arial Black', Impact, sans-serif`;
+                    c.fillText('⟳', 38, 30);
+                } else if (cardType === 'draw2') {
+                    c.font = `bold 48px 'Arial Black', Impact, sans-serif`;
+                    c.fillText('+2', 38, 34);
+                }
+                c.restore();
+
+                c.save();
+                c.translate(512, 768);
+                c.rotate(Math.PI);
+                c.fillStyle = '#ffffff';
+                c.font = `bold 64px 'Arial Black', Impact, sans-serif`;
+                c.textAlign = 'left';
+                c.textBaseline = 'top';
+                c.shadowColor = 'rgba(0,0,0,0.5)';
+                c.shadowBlur = 6;
+                c.shadowOffsetX = 1;
+                c.shadowOffsetY = 2;
+
+                if (cardType === 'number') {
+                    c.fillText(val, 38, 30);
+                } else if (cardType === 'skip') {
+                    const smallSize = 52;
+                    const smallR = smallSize * 0.35;
+                    c.strokeStyle = '#ffffff';
+                    c.lineWidth = smallSize * 0.16;
+                    c.beginPath();
+                    c.arc(38 + smallR + 10, 30 + smallR + 10, smallR, 0, Math.PI * 2);
+                    c.stroke();
+                    c.beginPath();
+                    c.moveTo(38 + 10, 30 + 10);
+                    c.lineTo(38 + smallR * 2 + 10, 30 + smallR * 2 + 10);
+                    c.stroke();
+                } else if (cardType === 'reverse') {
+                    c.font = `bold 56px 'Arial Black', Impact, sans-serif`;
+                    c.fillText('⟳', 38, 30);
+                } else if (cardType === 'draw2') {
+                    c.font = `bold 48px 'Arial Black', Impact, sans-serif`;
+                    c.fillText('+2', 38, 34);
+                }
+                c.restore();
+            } else {
+                c.save();
+                c.fillStyle = '#ffffff';
+                c.font = `bold 56px 'Arial Black', Impact, sans-serif`;
+                c.textAlign = 'left';
+                c.textBaseline = 'top';
+                c.shadowColor = 'rgba(0,0,0,0.6)';
+                c.shadowBlur = 6;
+                c.shadowOffsetX = 1;
+                c.shadowOffsetY = 2;
+                if (val === '+4' || cardType === 'wild4') {
+                    c.fillText('+4', 36, 28);
+                } else {
+                    c.fillText('★', 36, 28);
+                }
+                c.restore();
+
+                c.save();
+                c.translate(512, 768);
+                c.rotate(Math.PI);
+                c.fillStyle = '#ffffff';
+                c.font = `bold 56px 'Arial Black', Impact, sans-serif`;
+                c.textAlign = 'left';
+                c.textBaseline = 'top';
+                c.shadowColor = 'rgba(0,0,0,0.6)';
+                c.shadowBlur = 6;
+                c.shadowOffsetX = 1;
+                c.shadowOffsetY = 2;
+                if (val === '+4' || cardType === 'wild4') {
+                    c.fillText('+4', 36, 28);
+                } else {
+                    c.fillText('★', 36, 28);
+                }
+                c.restore();
+            }
+
+            return new THREE.CanvasTexture(cv);
+        }
+
+        function createProfessionalBackTex() {
+            const cv = document.createElement("canvas");
+            cv.width = 512;
+            cv.height = 768;
+            const c = cv.getContext("2d");
+            c.fillStyle = '#12141a';
+            c.fillRect(0, 0, 512, 768);
+            c.strokeStyle = '#8257e6';
+            c.lineWidth = 22;
+            c.strokeRect(16, 16, 480, 736);
+            c.fillStyle = '#2a1a4a';
+            c.beginPath();
+            c.ellipse(256, 384, 160, 220, -Math.PI / 4, 0, Math.PI * 2);
+            c.fill();
+            c.strokeStyle = '#4a2d7a';
+            c.lineWidth = 6;
+            c.beginPath();
+            c.ellipse(256, 384, 140, 200, -Math.PI / 4, 0, Math.PI * 2);
+            c.stroke();
+            c.fillStyle = '#8257e6';
+            c.font = "bold 80px 'Arial Black', Impact, sans-serif";
+            c.textAlign = 'center';
+            c.textBaseline = 'middle';
+            c.shadowColor = 'rgba(130,87,230,0.5)';
+            c.shadowBlur = 20;
+            c.fillText('CARTE', 256, 384);
+            c.shadowBlur = 0;
+            c.fillStyle = '#5a3a9a';
+            c.font = "bold 40px 'Arial Black', Impact, sans-serif";
+            c.fillText('✦', 256, 270);
+            c.fillText('✦', 256, 498);
+            return new THREE.CanvasTexture(cv);
+        }
+
+        const backTexture = createProfessionalBackTex();
+
+        function buildCardMesh(cardData, isBackOnly = false, isHandCard = false) {
+            const grp = new THREE.Group();
+            const geo = new THREE.BoxGeometry(0.48, 0.70, 0.012);
+            const isWild = cardData.color === "wild";
+            const cardType = cardData.type || 'number';
+            const faceTex = isBackOnly ? backTexture : createProfessionalCardTex(cardData.val, cardData.hex, isWild, cardType);
+
+            const faceM = new THREE.MeshStandardMaterial({
+                map: faceTex,
+                color: isBackOnly ? 0x666666 : 0x2a2a2a,
+                roughness: 0.35,
+                metalness: 0.0,
+                emissiveMap: faceTex,
+                emissive: 0xffffff,
+                emissiveIntensity: isBackOnly ? 0.18 : 0.98
+            });
+            const backM = new THREE.MeshStandardMaterial({ map: backTexture, roughness: 0.25, metalness: 0.05 });
+            const edgeM = new THREE.MeshStandardMaterial({
+                color: isWild ? 0x1a1a1a : 0x0d0d0d,
+                roughness: 0.35,
+                emissive: 0x000000,
+                emissiveIntensity: 0
+            });
+
+            const mats = [edgeM, edgeM, edgeM, edgeM, faceM, backM];
+            if (isHandCard) {
+                mats.forEach(m => { m.depthTest = false; m.depthWrite = false; });
+            }
+
+            const mesh = new THREE.Mesh(geo, mats);
+            mesh.castShadow = Q.shadows;
+            mesh.receiveShadow = Q.shadows;
+            mesh.renderOrder = isHandCard ? 999 : 0;
+            grp.add(mesh);
+
+            grp.userData = {
+                data: cardData,
+                edgeMaterial: edgeM,
+                isSelected: false
+            };
+            return grp;
+        }
+
+        function releaseFromHandRendering(cardGroup) {
+            cardGroup.traverse(obj => {
+                if (obj.isMesh) {
+                    obj.renderOrder = placedCardsCount + 10;
+                    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+                    mats.forEach(m => { if (m) { m.depthTest = true; m.depthWrite = true; } });
+                }
+            });
+        }
+
+        // ================================================
+        // 5. كومة السحب ومواد المشهد
+        // ================================================
+        const deckGroup = new THREE.Group();
+        deckGroup.position.set(-0.85, 0.408, 0.0);
+        deckGroup.rotation.y = Math.PI / 10;
+        for (let i = 0; i < 14; i++) {
+            const dummy = buildCardMesh({ val: "", color: "back", hex: "#111", type: "back" }, true, false);
+            dummy.position.set(0, i * 0.006, 0);
+            dummy.rotation.x = -Math.PI / 2;
+            deckGroup.add(dummy);
+        }
+        scene.add(deckGroup);
+
+        const playerHandGroup = new THREE.Group();
+        camera.add(playerHandGroup);
+        scene.add(camera);
+
+        const HAND_Y_PEEK = -0.76;
+        const HAND_Y_RAISED = -0.36;
+        let handTargetY = HAND_Y_PEEK;
+        playerHandGroup.position.set(0, handTargetY, -1.30);
+
+        let handScrollX = 0;
+        let targetHandScrollX = 0;
+        let maxHandScroll = 0;
+
+        const playerCards = [];
+        let opponents = [];
+
+        function arrangePlayerCards() {
+            const count = playerCards.length;
+            const spacing = count > 8 ? 0.20 : 0.26;
+            const totalWidth = (count - 1) * spacing;
+
+            playerCards.forEach((card, i) => {
+                const x = (i - (count - 1) / 2) * spacing;
+                const angle = (i - (count - 1) / 2) * (count > 8 ? 0.04 : 0.07);
+                const y = -Math.abs(angle) * 0.15;
+
+                card.position.set(x, y, 0);
+                card.rotation.z = -angle * 0.7;
+                card.rotation.x = 0.22;
+                card.userData.baseX = x;
+                card.userData.baseY = y;
+                card.userData.index = i;
+            });
+
+            maxHandScroll = Math.max(0, (totalWidth - 1.2) / 2);
+            targetHandScrollX = Math.max(-maxHandScroll, Math.min(maxHandScroll, targetHandScrollX));
+            document.getElementById("player-count").innerText = `${playerCards.length} كروت`;
+        }
+
+        function refreshOpponentMeshes(opp) {
+            while (opp.grp.children.length > 0) {
+                opp.grp.remove(opp.grp.children[0]);
+            }
+            const count = opp.cards.length;
+            const spacing = count > 8 ? 0.16 : 0.24;
+            opp.cards.forEach((cData, i) => {
+                const mesh = buildCardMesh(cData, false, false);
+                mesh.children[0].rotation.y = Math.PI;
+                mesh.position.set((i - (count - 1) / 2) * spacing, 0, 0);
+                mesh.rotation.y = (i - (count - 1) / 2) * 0.06;
+                opp.grp.add(mesh);
+            });
+            const tagEl = document.getElementById(opp.tagId);
+            if (tagEl) tagEl.querySelector(".p-count").innerText = `${count} كروت`;
+        }
+
+        const TABLE_CARD_SCALE = 2.2;
+        let placedCardsCount = 0;
+        const activeArcs = [];
+
+        const tableCardMeshes = [];
+
+        function clearTableCards() {
+            tableCardMeshes.forEach(m => scene.remove(m));
+            tableCardMeshes.length = 0;
+            placedCardsCount = 0;
+        }
+
+        function spawnInitialTableCard(cardData) {
+            clearTableCards();
+            const cardObj = buildCardMesh(cardData, false, false);
+            scene.add(cardObj);
+            cardObj.position.set(0, 0.408, 0);
+            cardObj.rotation.set(-Math.PI / 2, 0, 0);
+            cardObj.scale.set(TABLE_CARD_SCALE, TABLE_CARD_SCALE, TABLE_CARD_SCALE);
+            tableCardMeshes.push(cardObj);
+            placedCardsCount++;
+        }
+
+        function playCardWithArc(cardObj, startPos, startQuat, endPos, endQuat, onFinish) {
+            scene.add(cardObj);
+            cardObj.position.copy(startPos);
+            cardObj.quaternion.copy(startQuat);
+
+            const midPoint = new THREE.Vector3().addVectors(startPos, endPos).multiplyScalar(0.5);
+            midPoint.y += 1.2;
+
+            activeArcs.push({
+                obj: cardObj,
+                p0: startPos.clone(),
+                p1: midPoint,
+                p2: endPos.clone(),
+                q0: startQuat.clone(),
+                q1: endQuat.clone(),
+                s0: cardObj.scale.clone(),
+                s1: new THREE.Vector3(TABLE_CARD_SCALE, TABLE_CARD_SCALE, TABLE_CARD_SCALE),
+                t: 0,
+                speed: 0.055,
+                onFinish
+            });
+        }
+
+        function getNextStackTransform() {
+            const yPos = 0.408 + (placedCardsCount * 0.005);
+            placedCardsCount++;
+            return {
+                targetPos: new THREE.Vector3(0, yPos, 0),
+                targetQuat: new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0))
+            };
+        }
+
+        function getDeckWorldPosition() {
+            const pos = new THREE.Vector3();
+            deckGroup.getWorldPosition(pos);
+            pos.y += 0.05;
+            return pos;
+        }
+
+        function getPlayerTargetPosWorld(relSeat) {
+            if (relSeat === 0) {
+                const v = new THREE.Vector3();
+                playerHandGroup.getWorldPosition(v);
+                return v;
+            }
+            const opp = opponents[relSeat - 1];
+            return new THREE.Vector3(opp.pos[0], opp.pos[1], opp.pos[2]);
+        }
+
+        function getPlayerTargetQuat(relSeat) {
+            if (relSeat === 0) {
+                return new THREE.Quaternion().setFromEuler(new THREE.Euler(0.35, 0, 0));
+            }
+            const opp = opponents[relSeat - 1];
+            return new THREE.Quaternion().setFromEuler(new THREE.Euler(0, opp.rotY, 0));
+        }
+
+        function animateCardDrawTo(targetPos, targetQuat, onArrive) {
+            const cardObj = buildCardMesh({ val: "", color: "back", hex: "#111", type: "back" }, true, false);
+            const startPos = getDeckWorldPosition();
+            const startQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, deckGroup.rotation.y, 0));
+            scene.add(cardObj);
+            cardObj.position.copy(startPos);
+            cardObj.quaternion.copy(startQuat);
+            cardObj.scale.set(1, 1, 1);
+
+            const midPoint = new THREE.Vector3().addVectors(startPos, targetPos).multiplyScalar(0.5);
+            midPoint.y += 0.9;
+
+            activeArcs.push({
+                obj: cardObj,
+                p0: startPos.clone(),
+                p1: midPoint,
+                p2: targetPos.clone(),
+                q0: startQuat.clone(),
+                q1: targetQuat.clone(),
+                s0: cardObj.scale.clone(),
+                s1: new THREE.Vector3(1, 1, 1),
+                t: 0,
+                speed: 0.1,
+                onFinish: () => {
+                    scene.remove(cardObj);
+                    if (onArrive) onArrive();
+                }
+            });
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById("action-toast");
+            toast.innerText = msg;
+        }
+
+        const OFFICIAL_COLOR_NAMES = {
+            red: 'أحمر',
+            blue: 'أزرق',
+            green: 'أخضر',
+            yellow: 'أصفر',
+            wild: 'وايلد'
+        };
+
+        function getColorNameAr(col) {
+            return OFFICIAL_COLOR_NAMES[col] || col;
+        }
+
+        
+        // ================================================
+        // 5.B محرك اللعب الفردي 100% بدون سيرفر (OFFLINE SOLO ENGINE)
+        // ================================================
+        let isMultiplayer = false;
+        let drawDeckDataLocal = [];
+        let playedDiscardPileLocal = [];
+        let pendingWildCardDataLocal = null;
+        let soloTotalPlayers = 4;
+
+        function create108UnoDeckLocal() {
+            const deck = [];
+            let id = 1;
+            const COLORS = [
+                { name: "red", hex: "#C62828", ar: "أحمر" },
+                { name: "blue", hex: "#1565C0", ar: "أزرق" },
+                { name: "green", hex: "#2E7D32", ar: "أخضر" },
+                { name: "yellow", hex: "#F9A825", ar: "أصفر" }
+            ];
+
+            COLORS.forEach(c => {
+                deck.push({ id: id++, color: c.name, hex: c.hex, val: "0", type: "number" });
+                for (let i = 1; i <= 9; i++) {
+                    deck.push({ id: id++, color: c.name, hex: c.hex, val: "" + i, type: "number" });
+                    deck.push({ id: id++, color: c.name, hex: c.hex, val: "" + i, type: "number" });
+                }
+                for (let k = 0; k < 2; k++) {
+                    deck.push({ id: id++, color: c.name, hex: c.hex, val: "🚫", type: "skip" });
+                    deck.push({ id: id++, color: c.name, hex: c.hex, val: "🔄", type: "reverse" });
+                    deck.push({ id: id++, color: c.name, hex: c.hex, val: "+2", type: "draw2" });
+                }
+            });
+
+            for (let i = 0; i < 4; i++) {
+                deck.push({ id: id++, color: "wild", hex: "#212121", val: "★", type: "wild" });
+                deck.push({ id: id++, color: "wild", hex: "#212121", val: "+4", type: "wild4" });
+            }
+
+            for (let i = deck.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [deck[i], deck[j]] = [deck[j], deck[i]];
+            }
+            return deck;
+        }
+
+        function createOpponentsLocal(totalPlayers) {
+            opponents.forEach(o => scene.remove(o.grp));
+            document.getElementById("opponent-tags-container").innerHTML = "";
+            opponents = [];
+
+            const nOpp = totalPlayers - 1;
+            const baseRadius = 2.0;
+            const extraOpp = Math.max(0, nOpp - 3);
+            const radius = baseRadius + extraOpp * 0.34;
+
+            for (let i = 0; i < nOpp; i++) {
+                let thetaDeg = (nOpp === 1) ? 0 : (-140 + i * (280 / (nOpp - 1)));
+                const theta = thetaDeg * Math.PI / 180;
+                const x = radius * Math.sin(theta);
+                const z = -radius * Math.cos(theta);
+                const rotY = -theta;
+
+                const tagId = `opp-tag-${i}`;
+                const opp = {
+                    id: `opp-${i}`,
+                    serverSeat: i + 1,
+                    name: `بوت ${i + 1}`,
+                    tagId: tagId,
+                    pos: [x, 1.4, z],
+                    rotY: rotY,
+                    cards: []
+                };
+
+                const oppGrp = new THREE.Group();
+                oppGrp.position.set(...opp.pos);
+                oppGrp.rotation.y = opp.rotY;
+                opp.grp = oppGrp;
+                scene.add(oppGrp);
+
+                const tagDiv = document.createElement("div");
+                tagDiv.className = "player-tag";
+                tagDiv.id = tagId;
+                tagDiv.innerHTML = `<span class="p-name">${opp.name}</span><span class="p-count">7 كروت</span>`;
+                document.getElementById("opponent-tags-container").appendChild(tagDiv);
+
+                opponents.push(opp);
+            }
+        }
+
+        function dealCardsLocal(count = 7) {
+            for (let i = 0; i < count; i++) {
+                const pCard = drawDeckDataLocal.pop();
+                const pMesh = buildCardMesh(pCard, false, true);
+                playerCards.push(pMesh);
+                playerHandGroup.add(pMesh);
+
+                opponents.forEach(opp => {
+                    opp.cards.push(drawDeckDataLocal.pop());
+                });
+            }
+            arrangePlayerCards();
+            opponents.forEach(refreshOpponentMeshes);
+        }
+
+        function pickInitialTopCardLocal() {
+            while (true) {
+                const c = drawDeckDataLocal.pop();
+                if (c.type === "number") {
+                    currentTopCard = c;
+                    activeColor = c.color;
+                    break;
+                } else {
+                    drawDeckDataLocal.unshift(c);
+                }
+            }
+        }
+
+        function recycleDeckLocal() {
+            if (playedDiscardPileLocal.length > 1) {
+                const top = playedDiscardPileLocal.pop();
+                drawDeckDataLocal = [...playedDiscardPileLocal];
+                playedDiscardPileLocal = [top];
+                for (let i = drawDeckDataLocal.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [drawDeckDataLocal[i], drawDeckDataLocal[j]] = [drawDeckDataLocal[j], drawDeckDataLocal[i]];
+                }
+            } else {
+                drawDeckDataLocal = create108UnoDeckLocal();
+            }
+        }
+
+        function drawCardsAnimatedLocal(playerIdx, count, onAllDone) {
+            let done = 0;
+            function drawNext() {
+                if (done >= count) {
+                    if (onAllDone) onAllDone();
+                    return;
+                }
+                if (drawDeckDataLocal.length === 0) recycleDeckLocal();
+                const cardData = drawDeckDataLocal.pop();
+                const targetPos = getPlayerTargetPosWorld(playerIdx);
+                const targetQuat = getPlayerTargetQuat(playerIdx);
+
+                animateCardDrawTo(targetPos, targetQuat, () => {
+                    if (playerIdx === 0) {
+                        const mesh = buildCardMesh(cardData, false, true);
+                        playerCards.push(mesh);
+                        playerHandGroup.add(mesh);
+                        arrangePlayerCards();
+                    } else {
+                        opponents[playerIdx - 1].cards.push(cardData);
+                        refreshOpponentMeshes(opponents[playerIdx - 1]);
+                    }
+                    done++;
+                    setTimeout(drawNext, 170);
+                });
+            }
+            drawNext();
+        }
+
+        function setTurnLocal(nextPlayerIdx) {
+            currentTurn = nextPlayerIdx;
+
+            opponents.forEach(o => {
+                const tagEl = document.getElementById(o.tagId);
+                if (tagEl) tagEl.classList.remove("active-turn");
+                o.grp.children.forEach(c => {
+                    if (c.userData.edgeMaterial) {
+                        c.userData.edgeMaterial.emissive.setHex(0x000000);
+                        c.userData.edgeMaterial.emissiveIntensity = 0;
+                    }
+                });
+            });
+            document.getElementById("player-status-tag").classList.remove("active-turn");
+
+            const colName = getColorNameAr(activeColor);
+
+            if (currentTurn === 0) {
+                document.getElementById("player-status-tag").classList.add("active-turn");
+                drawBtn.disabled = false;
+                showToast(`نوبتك | اللون المطلوب: ${colName}`);
+            } else {
+                drawBtn.disabled = true;
+                const opp = opponents[currentTurn - 1];
+                if (opp) {
+                    const tagEl = document.getElementById(opp.tagId);
+                    if (tagEl) tagEl.classList.add("active-turn");
+                    showToast(`نوبة: ${opp.name} (اللون: ${colName})`);
+
+                    setTimeout(() => {
+                        if (isGameActive && !isMultiplayer && currentTurn === nextPlayerIdx) {
+                            executeBotTurnLocal(opp, currentTurn);
+                        }
+                    }, 800);
+                }
+            }
+        }
+
+        function finishCardEffectAndAdvanceLocal(cardData, chosenColor) {
+            currentTopCard = cardData;
+            activeColor = chosenColor || cardData.color;
+            playedDiscardPileLocal.push(cardData);
+
+            let step = turnDirection;
+            let actionMsg = "";
+            let penaltyPlayer = null;
+            let penaltyAmount = 0;
+
+            if (cardData.type === "reverse") {
+                if (soloTotalPlayers === 2) {
+                    step = turnDirection * 2;
+                    actionMsg = "عكس اتجاه اللعب (تخطي) 🔄!";
+                } else {
+                    turnDirection *= -1;
+                    step = turnDirection;
+                    actionMsg = "عكس اتجاه اللعب 🔄!";
+                }
+            } else if (cardData.type === "skip") {
+                step = turnDirection * 2;
+                actionMsg = "تخطي اللاعب الموالي 🚫!";
+            } else if (cardData.type === "draw2") {
+                penaltyPlayer = (currentTurn + turnDirection + soloTotalPlayers * 4) % soloTotalPlayers;
+                penaltyAmount = 2;
+                step = turnDirection * 2;
+                actionMsg = "سحب 2 كروت وإلغاء النوبة +2!";
+            } else if (cardData.type === "wild4") {
+                penaltyPlayer = (currentTurn + turnDirection + soloTotalPlayers * 4) % soloTotalPlayers;
+                penaltyAmount = 4;
+                step = turnDirection * 2;
+                actionMsg = "سحب 4 كروت وإلغاء النوبة +4!";
+            }
+
+            const colName = getColorNameAr(activeColor);
+            showToast(actionMsg ? `${actionMsg} (اللون: ${colName})` : `اللون الحالي: ${colName}`);
+
+            function proceedTurn() {
+                if (currentTurn === 0 && playerCards.length === 0) {
+                    isGameActive = false;
+                    document.getElementById("game-over-title").innerText = "انتصار مستحق! 🎉";
+                    document.getElementById("game-over-desc").innerText = "مبروك ربحتي الطرح ضد البوتات!";
+                    document.getElementById("game-over-modal").style.display = "flex";
+                    return;
+                } else if (currentTurn > 0 && opponents[currentTurn - 1] && opponents[currentTurn - 1].cards.length === 0) {
+                    isGameActive = false;
+                    const winner = opponents[currentTurn - 1].name;
+                    document.getElementById("game-over-title").innerText = "انتهت اللعبة";
+                    document.getElementById("game-over-desc").innerText = `ربح ${winner} 🏆! حظ أوفر في الطرح القادم.`;
+                    document.getElementById("game-over-modal").style.display = "flex";
+                    return;
+                }
+
+                const nextPlayer = (currentTurn + step + soloTotalPlayers * 8) % soloTotalPlayers;
+                setTurnLocal(nextPlayer);
+            }
+
+            if (penaltyPlayer !== null) {
+                drawCardsAnimatedLocal(penaltyPlayer, penaltyAmount, proceedTurn);
+            } else {
+                proceedTurn();
+            }
+        }
+
+        function executeBotTurnLocal(opp, oppIndex) {
+            if (!isGameActive || isMultiplayer) return;
+            const playableIdx = opp.cards.findIndex(c => isValidPlay(c));
+
+            if (playableIdx !== -1) {
+                const cardData = opp.cards.splice(playableIdx, 1)[0];
+                refreshOpponentMeshes(opp);
+
+                const cardObj = buildCardMesh(cardData, false, false);
+                const sPos = new THREE.Vector3(...opp.pos);
+                const sQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, opp.rotY, 0));
+                const stackTransform = getNextStackTransform();
+
+                playCardWithArc(cardObj, sPos, sQuat, stackTransform.targetPos, stackTransform.targetQuat, () => {
+                    let chosenColor = cardData.color;
+                    if (cardData.color === "wild") {
+                        const counts = { red: 0, blue: 0, green: 0, yellow: 0 };
+                        opp.cards.forEach(c => { if (counts[c.color] !== undefined) counts[c.color]++; });
+                        chosenColor = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
+                    }
+                    finishCardEffectAndAdvanceLocal(cardData, chosenColor);
+                });
+            } else {
+                drawCardsAnimatedLocal(oppIndex, 1, () => {
+                    showToast(`${opp.name} سحب ورقة`);
+                    setTimeout(() => {
+                        const nextPlayer = (currentTurn + turnDirection + soloTotalPlayers * 4) % soloTotalPlayers;
+                        setTurnLocal(nextPlayer);
+                    }, 350);
+                });
+            }
+        }
+
+        function throwPlayerCardLocal(cardMesh) {
+            if (currentTurn !== 0) {
+                showToast("ليس دورك الآن!");
+                deselectCard();
+                return;
+            }
+
+            const cardData = cardMesh.userData.data;
+            if (!isValidPlay(cardData)) {
+                showToast("كارطة غير مطابقة! خاص نفس اللون أو الرمز");
+                deselectCard();
+                return;
+            }
+
+            const idx = playerCards.indexOf(cardMesh);
+            if (idx > -1) playerCards.splice(idx, 1);
+
+            const sPos = new THREE.Vector3();
+            const sQuat = new THREE.Quaternion();
+            cardMesh.getWorldPosition(sPos);
+            cardMesh.getWorldQuaternion(sQuat);
+            playerHandGroup.remove(cardMesh);
+
+            releaseFromHandRendering(cardMesh);
+            const stackTransform = getNextStackTransform();
+            resetAndLowerHand();
+            arrangePlayerCards();
+
+            playCardWithArc(cardMesh, sPos, sQuat, stackTransform.targetPos, stackTransform.targetQuat, () => {
+                if (cardData.color === "wild") {
+                    pendingWildCardDataLocal = cardData;
+                    isColorPickerOpen = true;
+                    colorPickerModal.style.display = "flex";
+                } else {
+                    finishCardEffectAndAdvanceLocal(cardData, cardData.color);
+                }
+            });
+        }
+
+        function drawCardLocal() {
+            drawCardsAnimatedLocal(0, 1, () => {
+                handTargetY = HAND_Y_RAISED;
+                showToast("سحبتي ورقة");
+                setTimeout(() => {
+                    resetAndLowerHand();
+                    const nextPlayer = (currentTurn + turnDirection + soloTotalPlayers * 4) % soloTotalPlayers;
+                    setTurnLocal(nextPlayer);
+                }, 500);
+            });
+        }
+
+        function startSoloGame(totalPlayers) {
+            isMultiplayer = false;
+            isGameActive = true;
+            soloTotalPlayers = totalPlayers;
+            mySeat = 0;
+            totalGamePlayers = totalPlayers;
+
+            document.getElementById("lobby-overlay").style.display = "none";
+            document.getElementById("player-status-tag").style.display = "block";
+            document.getElementById("my-player-name").innerText = getNickname() + ' (أنت)';
+            drawBtn.style.display = "block";
+            domEl.style.pointerEvents = "auto";
+
+            while (playerHandGroup.children.length > 0) {
+                playerHandGroup.remove(playerHandGroup.children[0]);
+            }
+            playerCards.length = 0;
+
+            drawDeckDataLocal = create108UnoDeckLocal();
+            playedDiscardPileLocal = [];
+            turnDirection = 1;
+
+            createOpponentsLocal(soloTotalPlayers);
+            dealCardsLocal(7);
+            pickInitialTopCardLocal();
+            spawnInitialTableCard(currentTopCard);
+
+            history.pushState({ inGame: true, mode: 'solo' }, '', window.location.href);
+
+            setTurnLocal(0);
+            showToast("بدأت اللعبة الفردية ضد البوتات! دورك الآن");
+        }
+
+        // ================================================
+        // 6. شبكة MULTIPLAYER ومزامنة الأحداث (WebSockets)
+        // ================================================
+        let ws = null;
+        let mySessionId = sessionStorage.getItem('uno_session_id');
+        if (!mySessionId) {
+            mySessionId = 'sess_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+            sessionStorage.setItem('uno_session_id', mySessionId);
+        }
+
+        let mySeat = 0;
+        let totalGamePlayers = 4;
+        let roomPlayers = [];
+        let currentRoomCode = sessionStorage.getItem('uno_room_code') || null;
+        let isHost = false;
+
+        let currentTurn = 0;
+        let turnDirection = 1;
+        let currentTopCard = null;
+        let activeColor = null;
+
+        let isGameActive = false;
+        let isColorPickerOpen = false;
+        let pendingWildCardMesh = null;
+
+        const drawBtn = document.getElementById("draw-btn");
+        const colorPickerModal = document.getElementById("color-picker-modal");
+        const netDot = document.getElementById("net-dot");
+        const netStatusText = document.getElementById("net-status-text");
+
+        function toRelSeat(serverSeat) {
+            return (serverSeat - mySeat + totalGamePlayers) % totalGamePlayers;
+        }
+
+        function createOpponentsMultiplayer(totalPlayers) {
+            opponents.forEach(o => scene.remove(o.grp));
+            document.getElementById("opponent-tags-container").innerHTML = "";
+            opponents = [];
+
+            const nOpp = totalPlayers - 1;
+            const baseRadius = 2.0;
+            const extraOpp = Math.max(0, nOpp - 3);
+            const radius = baseRadius + extraOpp * 0.34;
+
+            for (let i = 0; i < nOpp; i++) {
+                let thetaDeg = (nOpp === 1) ? 0 : (-140 + i * (280 / (nOpp - 1)));
+                const theta = thetaDeg * Math.PI / 180;
+                const x = radius * Math.sin(theta);
+                const z = -radius * Math.cos(theta);
+                const rotY = -theta;
+
+                const serverSeatOfOpp = (mySeat + 1 + i) % totalPlayers;
+                const pInfo = roomPlayers.find(p => p.seatIndex === serverSeatOfOpp) || { nickname: `لاعب ${serverSeatOfOpp + 1}`, isBot: false };
+
+                const tagId = `opp-tag-${i}`;
+                const opp = {
+                    id: `opp-${i}`,
+                    serverSeat: serverSeatOfOpp,
+                    name: pInfo.nickname + (pInfo.isBot ? ' 🤖' : ''),
+                    tagId: tagId,
+                    pos: [x, 1.4, z],
+                    rotY: rotY,
+                    cards: []
+                };
+
+                const initialCount = pInfo.cardCount || 7;
+                for (let k = 0; k < initialCount; k++) {
+                    opp.cards.push({ val: "", color: "back", hex: "#111", type: "back" });
+                }
+
+                const oppGrp = new THREE.Group();
+                oppGrp.position.set(...opp.pos);
+                oppGrp.rotation.y = opp.rotY;
+                opp.grp = oppGrp;
+                scene.add(oppGrp);
+
+                const tagDiv = document.createElement("div");
+                tagDiv.className = "player-tag";
+                tagDiv.id = tagId;
+                tagDiv.innerHTML = `<span class="p-name">${opp.name}</span><span class="p-count">${initialCount} كروت</span>`;
+                document.getElementById("opponent-tags-container").appendChild(tagDiv);
+
+                opponents.push(opp);
+                refreshOpponentMeshes(opp);
+            }
+        }
+
+        function setTurnMultiplayer(serverTurn) {
+            currentTurn = serverTurn;
+            const relTurn = toRelSeat(serverTurn);
+
+            opponents.forEach(o => {
+                const tagEl = document.getElementById(o.tagId);
+                if (tagEl) tagEl.classList.remove("active-turn");
+                o.grp.children.forEach(c => {
+                    if (c.userData.edgeMaterial) {
+                        c.userData.edgeMaterial.emissive.setHex(0x000000);
+                        c.userData.edgeMaterial.emissiveIntensity = 0;
+                    }
+                });
+            });
+            document.getElementById("player-status-tag").classList.remove("active-turn");
+
+            const colName = getColorNameAr(activeColor);
+
+            if (relTurn === 0) {
+                document.getElementById("player-status-tag").classList.add("active-turn");
+                drawBtn.disabled = false;
+                showToast(`نوبتك الآن! | اللون المطلوب: ${colName}`);
+            } else {
+                drawBtn.disabled = true;
+                const opp = opponents[relTurn - 1];
+                if (opp) {
+                    const tagEl = document.getElementById(opp.tagId);
+                    if (tagEl) tagEl.classList.add("active-turn");
+                    showToast(`نوبة: ${opp.name} (اللون: ${colName})`);
+                }
+            }
+        }
+
+        // ================================================
+        // 7. اتصال السيرفر ومعالجة الرسائل
+        // ================================================
+        let savedHost = localStorage.getItem('uno_server_host');
+        let activeHost = savedHost || (location.host && !location.host.startsWith('localhost:8080') && location.port ? location.host : 'localhost:3000');
+
+        function connectWebSocket(overrideHost = null) {
+            if (overrideHost) {
+                activeHost = overrideHost.replace(/^https?:\/\//, '').replace(/^wss?:\/\//, '');
+                localStorage.setItem('uno_server_host', activeHost);
+            }
+            if (ws) {
+                try { ws.close(); } catch(e) {}
+            }
+            const wsUrl = `ws://${activeHost}`;
+
+            netDot.className = "status-dot";
+            netStatusText.innerText = "جاري الاتصال...";
+
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                netDot.className = "status-dot";
+                netStatusText.innerText = "متصل بالشبكة";
+
+                if (currentRoomCode && mySessionId) {
+                    wsSend({
+                        type: 'reconnect',
+                        roomCode: currentRoomCode,
+                        sessionId: mySessionId
+                    });
+                }
+            };
+
+            ws.onclose = () => {
+                netDot.className = "status-dot disconnected";
+                netStatusText.innerText = "غير متصل (سولو متاح)";
+                // Only retry connecting if in multiplayer or waiting in lobby
+                if (isMultiplayer || (document.getElementById("lobby-overlay") && document.getElementById("lobby-overlay").style.display !== "none")) {
+                    setTimeout(connectWebSocket, 4000);
+                }
+            };
+
+            ws.onerror = (err) => {
+                netDot.className = "status-dot disconnected";
+                netStatusText.innerText = "غير متصل (سولو متاح)";
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const msg = JSON.parse(event.data);
+                    handleServerMessage(msg);
+                } catch (e) {
+                    console.error('Invalid message from server:', e);
+                }
+            };
+        }
+
+        function wsSend(payload) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify(payload));
+            } else {
+                showToast("⚠️ السيرفر غير متصل حالياً");
+            }
+        }
+
+        function handleServerMessage(msg) {
+            const { type } = msg;
+
+            if (type === 'error') {
+                showToast(`❌ ${msg.message}`);
+                alert(msg.message);
+                return;
+            }
+
+            if (type === 'room_created') {
+                currentRoomCode = msg.roomCode;
+                sessionStorage.setItem('uno_room_code', currentRoomCode);
+                mySeat = msg.mySeat;
+                isHost = true;
+                roomPlayers = msg.players;
+                updateHostLobbyView();
+                showScreen('screen-host');
+                return;
+            }
+
+            if (type === 'room_joined') {
+                currentRoomCode = msg.roomCode;
+                sessionStorage.setItem('uno_room_code', currentRoomCode);
+                mySeat = msg.mySeat;
+                isHost = msg.isHost;
+                roomPlayers = msg.players;
+                if (isHost) {
+                    updateHostLobbyView();
+                    showScreen('screen-host');
+                } else {
+                    updateWaitingLobbyView();
+                    showScreen('screen-waiting');
+                }
+                return;
+            }
+
+            if (type === 'player_list_update') {
+                roomPlayers = msg.players;
+                if (isHost) updateHostLobbyView();
+                else updateWaitingLobbyView();
+                return;
+            }
+
+            if (type === 'game_started') {
+                startGameMultiplayer(msg);
+                return;
+            }
+
+            if (type === 'card_played_broadcast') {
+                handleCardPlayedBroadcast(msg);
+                return;
+            }
+
+            if (type === 'cards_drawn_broadcast') {
+                handleCardsDrawnBroadcast(msg);
+                return;
+            }
+
+            if (type === 'choose_color_request') {
+                isColorPickerOpen = true;
+                colorPickerModal.style.display = "flex";
+                return;
+            }
+
+            if (type === 'host_changed') {
+                if (msg.newHostSeat === mySeat) {
+                    isHost = true;
+                    showToast('أصبحت أنت المضيف الجديد للغرفة 👑');
+                }
+                return;
+            }
+
+            if (type === 'player_status') {
+                if (msg.message) showToast(msg.message);
+                if (msg.replacedByBot && opponents.length > 0) {
+                    const rel = toRelSeat(msg.seatIndex);
+                    if (rel > 0 && opponents[rel - 1]) {
+                        opponents[rel - 1].name = msg.nickname;
+                        const el = document.getElementById(opponents[rel - 1].tagId);
+                        if (el) el.querySelector('.p-name').innerText = msg.nickname;
+                    }
+                }
+                return;
+            }
+
+            if (type === 'reconnected_state') {
+                restoreReconnectedState(msg);
+                return;
+            }
+        }
+
+        // ================================================
+        // 8. دورة حياة اللعبة وتشغيل الأنيميشن المتزامن
+        // ================================================
+        function startGameMultiplayer(data) {
+            isMultiplayer = true;
+            isGameActive = true;
+            document.getElementById("lobby-overlay").style.display = "none";
+            document.getElementById("player-status-tag").style.display = "block";
+            drawBtn.style.display = "block";
+            domEl.style.pointerEvents = "auto";
+
+            mySeat = data.mySeat;
+            totalGamePlayers = data.totalPlayers;
+            roomPlayers = data.players;
+            currentTopCard = data.currentTopCard;
+            activeColor = data.activeColor;
+            currentTurn = data.currentTurn;
+            turnDirection = data.turnDirection;
+
+            const myInfo = roomPlayers.find(p => p.seatIndex === mySeat);
+            if (myInfo) {
+                document.getElementById("my-player-name").innerText = myInfo.nickname + ' (أنت)';
+            }
+
+            history.pushState({ inGame: true }, '', window.location.href);
+
+            while (playerHandGroup.children.length > 0) {
+                playerHandGroup.remove(playerHandGroup.children[0]);
+            }
+            playerCards.length = 0;
+
+            createOpponentsMultiplayer(totalGamePlayers);
+
+            data.myHand.forEach(cData => {
+                const mesh = buildCardMesh(cData, false, true);
+                playerCards.push(mesh);
+                playerHandGroup.add(mesh);
+            });
+            arrangePlayerCards();
+
+            spawnInitialTableCard(currentTopCard);
+
+            setTurnMultiplayer(currentTurn);
+            showToast(`بدأت اللعبة! اللون: ${getColorNameAr(activeColor)}`);
+        }
+
+        function restoreReconnectedState(data) {
+            startGameMultiplayer({
+                mySeat: data.mySeat,
+                totalPlayers: data.totalPlayers,
+                players: data.players,
+                myHand: data.myCards,
+                currentTopCard: data.currentTopCard,
+                activeColor: data.activeColor,
+                currentTurn: data.currentTurn,
+                turnDirection: data.turnDirection
+            });
+
+            placedCardsCount = data.placedCardsCount || 1;
+
+            if (data.pendingWildForMe) {
+                isColorPickerOpen = true;
+                colorPickerModal.style.display = "flex";
+            }
+            showToast("🔄 تم استعادة حالة اللعبة بنجاح!");
+        }
+
+        function handleCardPlayedBroadcast(data) {
+            const relSeat = toRelSeat(data.playerSeat);
+            const cardData = data.cardData;
+            currentTopCard = cardData;
+            activeColor = data.activeColor;
+            turnDirection = data.turnDirection;
+
+            if (data.actionMsg) showToast(data.actionMsg);
+
+            function onArcDone() {
+                if (data.isWin) {
+                    isGameActive = false;
+                    const winnerText = (data.winnerSeat === mySeat) ? '🎉 مبروك! أنت الفائز في هذا الطرح!' : `🏆 الفائز هو: ${data.winnerName}`;
+                    document.getElementById("game-over-title").innerText = (data.winnerSeat === mySeat) ? 'انتصار مستحق!' : 'انتهى الطرح';
+                    document.getElementById("game-over-desc").innerText = winnerText;
+                    document.getElementById("game-over-modal").style.display = 'flex';
+                    return;
+                }
+
+                if (data.penaltyPlayerSeat !== null && data.penaltyAmount > 0) {
+                    const penRel = toRelSeat(data.penaltyPlayerSeat);
+                    let doneCount = 0;
+
+                    function drawNextPenalty() {
+                        if (doneCount >= data.penaltyAmount) {
+                            setTurnMultiplayer(data.nextTurn);
+                            return;
+                        }
+                        const tPos = getPlayerTargetPosWorld(penRel);
+                        const tQuat = getPlayerTargetQuat(penRel);
+
+                        animateCardDrawTo(tPos, tQuat, () => {
+                            if (penRel === 0 && data.penaltyCardsForMe && data.penaltyCardsForMe[doneCount]) {
+                                const mesh = buildCardMesh(data.penaltyCardsForMe[doneCount], false, true);
+                                playerCards.push(mesh);
+                                playerHandGroup.add(mesh);
+                                arrangePlayerCards();
+                            } else if (penRel > 0 && opponents[penRel - 1]) {
+                                opponents[penRel - 1].cards.push({ val: "", color: "back", hex: "#111", type: "back" });
+                                if (data.penaltyPlayerCardCount !== undefined) {
+                                    while (opponents[penRel - 1].cards.length < data.penaltyPlayerCardCount) {
+                                        opponents[penRel - 1].cards.push({ val: "", color: "back", hex: "#111", type: "back" });
+                                    }
+                                }
+                                refreshOpponentMeshes(opponents[penRel - 1]);
+                            }
+                            doneCount++;
+                            setTimeout(drawNextPenalty, 150);
+                        });
+                    }
+                    drawNextPenalty();
+                } else {
+                    setTurnMultiplayer(data.nextTurn);
+                }
+            }
+
+            if (relSeat === 0) {
+                if (pendingWildCardMesh) {
+                    pendingWildCardMesh = null;
+                    onArcDone();
+                } else {
+                    const existingMesh = playerCards.find(c => c.userData.data.id === cardData.id);
+                    if (existingMesh) {
+                        const idx = playerCards.indexOf(existingMesh);
+                        if (idx > -1) playerCards.splice(idx, 1);
+                        const sPos = new THREE.Vector3();
+                        const sQuat = new THREE.Quaternion();
+                        existingMesh.getWorldPosition(sPos);
+                        existingMesh.getWorldQuaternion(sQuat);
+                        playerHandGroup.remove(existingMesh);
+                        releaseFromHandRendering(existingMesh);
+                        resetAndLowerHand();
+                        arrangePlayerCards();
+                        const stackTransform = getNextStackTransform();
+                        playCardWithArc(existingMesh, sPos, sQuat, stackTransform.targetPos, stackTransform.targetQuat, onArcDone);
+                    } else {
+                        onArcDone();
+                    }
+                }
+            } else {
+                const opp = opponents[relSeat - 1];
+                if (opp && opp.cards.length > 0) {
+                    opp.cards.pop();
+                    refreshOpponentMeshes(opp);
+                }
+                const cardObj = buildCardMesh(cardData, false, false);
+                const sPos = new THREE.Vector3(...opp.pos);
+                const sQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, opp.rotY, 0));
+                const stackTransform = getNextStackTransform();
+                playCardWithArc(cardObj, sPos, sQuat, stackTransform.targetPos, stackTransform.targetQuat, onArcDone);
+            }
+        }
+
+        function handleCardsDrawnBroadcast(data) {
+            const relSeat = toRelSeat(data.playerSeat);
+            const targetPos = getPlayerTargetPosWorld(relSeat);
+            const targetQuat = getPlayerTargetQuat(relSeat);
+
+            animateCardDrawTo(targetPos, targetQuat, () => {
+                if (relSeat === 0) {
+                    if (data.drawnCardForMe) {
+                        const mesh = buildCardMesh(data.drawnCardForMe, false, true);
+                        playerCards.push(mesh);
+                        playerHandGroup.add(mesh);
+                        arrangePlayerCards();
+                        handTargetY = HAND_Y_RAISED;
+                        showToast("سحبتي ورقة");
+                    }
+                } else {
+                    const opp = opponents[relSeat - 1];
+                    if (opp) {
+                        opp.cards.push({ val: "", color: "back", hex: "#111", type: "back" });
+                        refreshOpponentMeshes(opp);
+                        showToast(`${opp.name} سحب ورقة`);
+                    }
+                }
+                setTurnMultiplayer(data.nextTurn);
+            });
+        }
+
+        // ================================================
+        // 9. تفاعل اللاعب المحلي ورمي الكروت
+        // ================================================
+        function isValidPlay(cardData) {
+            if (!currentTopCard) return true;
+            if (cardData.color === "wild") return true;
+            if (cardData.color === activeColor) return true;
+            if (cardData.val === currentTopCard.val) return true;
+            return false;
+        }
+
+        function throwPlayerCardMultiplayer(cardMesh) {
+            if (currentTurn !== mySeat) {
+                showToast("ليس دورك الآن!");
+                deselectCard();
+                return;
+            }
+
+            const cardData = cardMesh.userData.data;
+
+            if (!isValidPlay(cardData)) {
+                showToast("كارطة غير مطابقة! خاص نفس اللون أو الرمز");
+                deselectCard();
+                return;
+            }
+
+            const idx = playerCards.indexOf(cardMesh);
+            if (idx > -1) playerCards.splice(idx, 1);
+
+            const sPos = new THREE.Vector3();
+            const sQuat = new THREE.Quaternion();
+            cardMesh.getWorldPosition(sPos);
+            cardMesh.getWorldQuaternion(sQuat);
+            playerHandGroup.remove(cardMesh);
+
+            releaseFromHandRendering(cardMesh);
+            const stackTransform = getNextStackTransform();
+            resetAndLowerHand();
+            arrangePlayerCards();
+
+            if (cardData.color === "wild") {
+                pendingWildCardMesh = cardMesh;
+                playCardWithArc(cardMesh, sPos, sQuat, stackTransform.targetPos, stackTransform.targetQuat, () => {
+                    isColorPickerOpen = true;
+                    colorPickerModal.style.display = "flex";
+                });
+            } else {
+                playCardWithArc(cardMesh, sPos, sQuat, stackTransform.targetPos, stackTransform.targetQuat, () => {
+                    wsSend({
+                        type: 'play_card',
+                        cardId: cardData.id
+                    });
+                });
+            }
+        }
+
+        document.querySelectorAll(".color-choice-btn").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const selectedColor = btn.dataset.color;
+                colorPickerModal.style.display = "none";
+                isColorPickerOpen = false;
+
+                if (isMultiplayer) {
+                    if (pendingWildCardMesh) {
+                        const card = pendingWildCardMesh.userData.data;
+                        wsSend({
+                            type: 'play_card',
+                            cardId: card.id,
+                            chosenColor: selectedColor
+                        });
+                    } else {
+                        wsSend({
+                            type: 'choose_color',
+                            chosenColor: selectedColor
+                        });
+                    }
+                } else {
+                    if (pendingWildCardDataLocal) {
+                        const card = pendingWildCardDataLocal;
+                        pendingWildCardDataLocal = null;
+                        finishCardEffectAndAdvanceLocal(card, selectedColor);
+                    }
+                }
+            });
+        });
+
+        drawBtn.addEventListener("click", () => {
+            if (isMultiplayer) {
+                if (currentTurn !== mySeat) return;
+                drawBtn.disabled = true;
+                wsSend({ type: 'draw_card' });
+            } else {
+                if (currentTurn !== 0) return;
+                drawBtn.disabled = true;
+                drawCardLocal();
+            }
+        });
+
+        // ================================================
+        // 10. واجهة اللوبي (Lobby Screens & Responsive Flow)
+        // ================================================
+        let selectedSeatsCount = 4;
+
+        function showScreen(screenId) {
+            ['screen-main', 'screen-solo', 'screen-host', 'screen-join', 'screen-waiting'].forEach(id => {
+                document.getElementById(id).style.display = (id === screenId) ? 'flex' : 'none';
+            });
+        }
+
+        fetch('/api/info').then(res => res.json()).then(data => {
+            if (data && data.localIps && data.localIps.length > 0) {
+                const ip = data.localIps[0];
+                const fullUrl = `http://${ip}:${data.port}`;
+                document.getElementById('server-ip-info').style.display = 'flex';
+                document.getElementById('server-ip-text').innerText = fullUrl;
+                document.getElementById('host-lan-url').innerText = fullUrl;
+            }
+        }).catch(() => {});
+
+        
+        // Custom Server IP setting (for APK and manual overrides)
+        document.getElementById('server-ip-text').innerText = activeHost;
+        document.getElementById('btn-edit-ip').addEventListener('click', () => {
+            const container = document.getElementById('ip-edit-container');
+            const isHidden = (container.style.display === 'none' || !container.style.display);
+            container.style.display = isHidden ? 'flex' : 'none';
+            if (isHidden) {
+                document.getElementById('input-custom-ip').value = activeHost;
+            }
+        });
+        document.getElementById('btn-save-custom-ip').addEventListener('click', () => {
+            const val = document.getElementById('input-custom-ip').value.trim();
+            if (val) {
+                connectWebSocket(val);
+                document.getElementById('server-ip-text').innerText = val;
+                document.getElementById('ip-edit-container').style.display = 'none';
+                showToast(`تم تغيير السيرفر إلى: ${val}`);
+            }
+        });
+
+        const nickInput = document.getElementById('input-nickname');
+        nickInput.value = localStorage.getItem('uno_nickname') || '';
+        nickInput.addEventListener('input', () => {
+            localStorage.setItem('uno_nickname', nickInput.value.trim());
+        });
+
+        function getNickname() {
+            const val = nickInput.value.trim();
+            return val || 'لاعب ' + Math.floor(Math.random() * 899 + 100);
+        }
+
+        document.querySelectorAll('.seat-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.seat-btn').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+                selectedSeatsCount = parseInt(btn.dataset.seats) || 4;
+            });
+        });
+
+        
+        // Solo Mode Handling
+        let soloSelectedSeats = 4;
+        document.getElementById('btn-goto-solo').addEventListener('click', () => {
+            showScreen('screen-solo');
+        });
+        document.getElementById('btn-solo-back').addEventListener('click', () => {
+            showScreen('screen-main');
+        });
+        document.querySelectorAll('#solo-seat-selector .seat-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('#solo-seat-selector .seat-btn').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+                soloSelectedSeats = parseInt(btn.dataset.seats) || 4;
+                const botsCount = soloSelectedSeats - 1;
+                document.getElementById('solo-summary-text').innerText = `أنت + ${botsCount} بوتات (المجموع: ${soloSelectedSeats} لاعبين)`;
+            });
+        });
+        document.getElementById('btn-start-solo').addEventListener('click', () => {
+            startSoloGame(soloSelectedSeats);
+        });
+
+        document.getElementById('btn-goto-host').addEventListener('click', () => {
+            const nick = getNickname();
+            wsSend({
+                type: 'create_room',
+                nickname: nick,
+                sessionId: mySessionId
+            });
+        });
+
+        document.getElementById('btn-goto-join').addEventListener('click', () => {
+            showScreen('screen-join');
+        });
+
+        document.getElementById('btn-join-back').addEventListener('click', () => {
+            showScreen('screen-main');
+        });
+
+        document.getElementById('btn-do-join').addEventListener('click', () => {
+            const code = document.getElementById('input-room-code').value.trim();
+            if (!code) {
+                alert('الرجاء كتابة كود الغرفة');
+                return;
+            }
+            const nick = getNickname();
+            wsSend({
+                type: 'join_room',
+                roomCode: code,
+                nickname: nick,
+                sessionId: mySessionId
+            });
+        });
+
+        document.getElementById('btn-start-game').addEventListener('click', () => {
+            const fillWithBots = document.getElementById('chk-fill-bots').checked;
+            wsSend({
+                type: 'start_game',
+                fillWithBots: fillWithBots,
+                targetTotalPlayers: selectedSeatsCount
+            });
+        });
+
+        document.getElementById('btn-host-leave').addEventListener('click', () => {
+            wsSend({ type: 'leave_room' });
+            sessionStorage.removeItem('uno_room_code');
+            currentRoomCode = null;
+            showScreen('screen-main');
+        });
+
+        document.getElementById('btn-wait-leave').addEventListener('click', () => {
+            wsSend({ type: 'leave_room' });
+            sessionStorage.removeItem('uno_room_code');
+            currentRoomCode = null;
+            showScreen('screen-main');
+        });
+
+        document.getElementById('host-room-code').addEventListener('click', () => {
+            const text = document.getElementById('host-room-code').innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                showToast('✅ تم نسخ كود الغرفة!');
+            }).catch(() => {});
+        });
+
+        document.getElementById('host-lan-url').addEventListener('click', () => {
+            const text = document.getElementById('host-lan-url').innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                showToast('✅ تم نسخ رابط الشبكة!');
+            }).catch(() => {});
+        });
+
+        function updateHostLobbyView() {
+            document.getElementById('host-room-code').innerText = currentRoomCode || '----';
+            document.getElementById('host-player-count').innerText = roomPlayers.length;
+
+            const listEl = document.getElementById('host-player-list');
+            listEl.innerHTML = '';
+            roomPlayers.forEach(p => {
+                const item = document.createElement('div');
+                item.className = 'lobby-player-item' + (p.isHost ? ' is-host' : '');
+                const isMe = (p.sessionId === mySessionId);
+                item.innerHTML = `
+                    <span>${p.nickname} ${p.isBot ? '🤖' : ''}</span>
+                    <div>
+                        ${p.isHost ? '<span class="badge-host">المضيف 👑</span>' : ''}
+                        ${isMe ? '<span class="badge-you">أنت</span>' : ''}
+                    </div>
+                `;
+                listEl.appendChild(item);
+            });
+
+            const startBtn = document.getElementById('btn-start-game');
+            const canStart = (roomPlayers.length >= 2) || (roomPlayers.length >= 1 && document.getElementById('chk-fill-bots').checked);
+            startBtn.disabled = !canStart;
+        }
+
+        function updateWaitingLobbyView() {
+            document.getElementById('wait-room-code').innerText = currentRoomCode || '----';
+            document.getElementById('wait-player-count').innerText = roomPlayers.length;
+
+            const listEl = document.getElementById('wait-player-list');
+            listEl.innerHTML = '';
+            roomPlayers.forEach(p => {
+                const item = document.createElement('div');
+                item.className = 'lobby-player-item' + (p.isHost ? ' is-host' : '');
+                const isMe = (p.sessionId === mySessionId);
+                item.innerHTML = `
+                    <span>${p.nickname}</span>
+                    <div>
+                        ${p.isHost ? '<span class="badge-host">المضيف 👑</span>' : ''}
+                        ${isMe ? '<span class="badge-you">أنت</span>' : ''}
+                    </div>
+                `;
+                listEl.appendChild(item);
+            });
+        }
+
+        document.getElementById('game-over-ok-btn').addEventListener('click', () => {
+            document.getElementById('game-over-modal').style.display = 'none';
+            location.reload();
+        });
+
+        // ================================================
+        // 11. إدارة زر الرجوع (Back Navigation Handling)
+        // ================================================
+        function canGoBackFreely() {
+            if (!isGameActive) return true;
+            return false;
+        }
+
+        window.addEventListener('popstate', (e) => {
+            if (!canGoBackFreely()) {
+                // Intercept back button during game or color picking
+                history.pushState({ inGame: true }, '', window.location.href);
+                document.getElementById('leave-confirm-modal').style.display = 'flex';
+            } else {
+                // In lobby: if in any sub-screen (Join, Solo, Host, Waiting), go back to main menu
+                const mainVisible = document.getElementById('screen-main').style.display === 'flex';
+                if (!mainVisible) {
+                    showScreen('screen-main');
+                }
+            }
+        });
+
+        document.getElementById('cancel-leave-btn').addEventListener('click', () => {
+            document.getElementById('leave-confirm-modal').style.display = 'none';
+        });
+
+        document.getElementById('confirm-leave-btn').addEventListener('click', () => {
+            document.getElementById('leave-confirm-modal').style.display = 'none';
+            isGameActive = false;
+            if (isMultiplayer) {
+                wsSend({ type: 'leave_room' });
+                sessionStorage.removeItem('uno_room_code');
+            }
+            location.reload();
+        });
+
+        // ================================================
+        // 12. إعدادات الجودة
+        // ================================================
+        const settingsBtn = document.getElementById("settings-btn");
+        const qualityModal = document.getElementById("quality-modal");
+
+        function markActiveQualityBtn() {
+            document.querySelectorAll(".quality-btn").forEach(b => {
+                b.classList.toggle("active-quality", b.dataset.q === currentQuality);
+            });
+        }
+        markActiveQualityBtn();
+
+        settingsBtn.addEventListener("click", () => {
+            qualityModal.style.display = "flex";
+        });
+
+        document.getElementById("quality-close-btn").addEventListener("click", () => {
+            qualityModal.style.display = "none";
+        });
+
+        document.querySelectorAll(".quality-btn").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const chosen = btn.dataset.q;
+                if (chosen === currentQuality) {
+                    qualityModal.style.display = "none";
+                    return;
+                }
+                localStorage.setItem("uno3d_quality", chosen);
+                location.reload();
+            });
+        });
+
+        // ================================================
+        // 13. التفاعل باللمس
+        // ================================================
+        let isTouching = false;
+        let activePointerId = null;
+        let lastX = 0, lastY = 0;
+        let touchMode = "none";
+
+        let targetYaw = 0, targetPitch = -0.45;
+        let currentYaw = 0, currentPitch = -0.45;
+
+        let selectedPlayerCard = null;
+        let touchAccumY = 0;
+        let totalMovedDistance = 0;
+
+        const domEl = renderer.domElement;
+        domEl.style.pointerEvents = "none";
+
+        function deselectCard() {
+            if (selectedPlayerCard) {
+                selectedPlayerCard.userData.isSelected = false;
+                selectedPlayerCard = null;
+            }
+        }
+
+        function resetAndLowerHand() {
+            handTargetY = HAND_Y_PEEK;
+            deselectCard();
+        }
+
+        domEl.addEventListener("pointerdown", (e) => {
+            if (colorPickerModal.style.display === "flex") return;
+
+            domEl.setPointerCapture(e.pointerId);
+            activePointerId = e.pointerId;
+            isTouching = true;
+
+            lastX = e.clientX;
+            lastY = e.clientY;
+            touchAccumY = 0;
+            totalMovedDistance = 0;
+
+            const rect = domEl.getBoundingClientRect();
+            const mouse = new THREE.Vector2(
+                ((e.clientX - rect.left) / rect.width) * 2 - 1,
+                -((e.clientY - rect.top) / rect.height) * 2 + 1
+            );
+
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(mouse, camera);
+            const hits = raycaster.intersectObjects(playerHandGroup.children, true);
+
+            const candidateCards = [];
+            hits.forEach(h => {
+                let root = h.object;
+                while (root.parent && root.parent !== playerHandGroup) root = root.parent;
+                if (root.userData && root.userData.data && !candidateCards.includes(root)) {
+                    candidateCards.push(root);
+                }
+            });
+
+            if (e.clientY > window.innerHeight * 0.62 || candidateCards.length > 0) {
+                touchMode = "hand_area";
+                if (candidateCards.length > 0 && currentTurn === mySeat) {
+                    let bestTarget = candidateCards[0];
+                    if (candidateCards.length > 1) {
+                        let minDistance = Infinity;
+                        const tempV = new THREE.Vector3();
+                        candidateCards.forEach(card => {
+                            card.getWorldPosition(tempV);
+                            tempV.project(camera);
+                            const dx = tempV.x - mouse.x;
+                            const dy = tempV.y - mouse.y;
+                            const distSq = dx * dx + dy * dy;
+                            if (distSq < minDistance) {
+                                minDistance = distSq;
+                                bestTarget = card;
+                            }
+                        });
+                    }
+                    domEl.userData_clickedCard = bestTarget;
+                } else {
+                    domEl.userData_clickedCard = null;
+                }
+            } else {
+                touchMode = "camera";
+                domEl.userData_clickedCard = null;
+            }
+        });
+
+        domEl.addEventListener("pointermove", (e) => {
+            if (!isTouching || e.pointerId !== activePointerId) return;
+
+            const deltaX = e.clientX - lastX;
+            const deltaY = e.clientY - lastY;
+            lastX = e.clientX;
+            lastY = e.clientY;
+
+            totalMovedDistance += Math.abs(deltaX) + Math.abs(deltaY);
+
+            if (touchMode === "hand_area") {
+                touchAccumY += deltaY;
+                if (maxHandScroll > 0) {
+                    targetHandScrollX += deltaX * 0.0035;
+                    targetHandScrollX = Math.max(-maxHandScroll, Math.min(maxHandScroll, targetHandScrollX));
+                }
+                if (touchAccumY > 32) {
+                    resetAndLowerHand();
+                    touchAccumY = 0;
+                } else if (touchAccumY < -32) {
+                    handTargetY = HAND_Y_RAISED;
+                    touchAccumY = 0;
+                }
+            } else {
+                targetYaw -= deltaX * 0.0035;
+                targetPitch -= deltaY * 0.0025;
+                targetPitch = Math.max(-1.2, Math.min(0.8, targetPitch));
+            }
+        });
+
+        function endTouch(e) {
+            if (e.pointerId === activePointerId) {
+                if (totalMovedDistance < 10 && domEl.userData_clickedCard && currentTurn === mySeat) {
+                    const target = domEl.userData_clickedCard;
+                    if (handTargetY === HAND_Y_PEEK) {
+                        handTargetY = HAND_Y_RAISED;
+                        if (selectedPlayerCard) selectedPlayerCard.userData.isSelected = false;
+                        target.userData.isSelected = true;
+                        selectedPlayerCard = target;
+                    } else if (selectedPlayerCard === target) {
+                        if (isMultiplayer) {
+                            throwPlayerCardMultiplayer(target);
+                        } else {
+                            throwPlayerCardLocal(target);
+                        }
+                        selectedPlayerCard = null;
+                    } else {
+                        if (selectedPlayerCard) selectedPlayerCard.userData.isSelected = false;
+                        target.userData.isSelected = true;
+                        selectedPlayerCard = target;
+                    }
+                } else if (totalMovedDistance < 10 && touchMode === "camera") {
+                    if (selectedPlayerCard) deselectCard();
+                }
+
+                isTouching = false;
+                activePointerId = null;
+                touchMode = "none";
+                domEl.userData_clickedCard = null;
+                try { domEl.releasePointerCapture(e.pointerId); } catch (err) {}
+            }
+        }
+
+        domEl.addEventListener("pointerup", endTouch);
+        domEl.addEventListener("pointercancel", endTouch);
+
+        // ================================================
+        // 14. حلقة الرندر المستمرة
+        // ================================================
+        const clock = new THREE.Clock();
+        const tempProj = new THREE.Vector3();
+
+        function updatePlayerTags() {
+            opponents.forEach(opp => {
+                const el = document.getElementById(opp.tagId);
+                if (!el) return;
+                tempProj.set(...opp.pos);
+                tempProj.y += 0.55;
+                tempProj.project(camera);
+
+                if (tempProj.z > 1) {
+                    el.style.display = "none";
+                    return;
+                }
+                el.style.display = "block";
+                const x = (tempProj.x * 0.5 + 0.5) * window.innerWidth;
+                const y = (-(tempProj.y * 0.5) + 0.5) * window.innerHeight;
+                el.style.left = `${x}px`;
+                el.style.top = `${y}px`;
+            });
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const time = clock.getElapsedTime();
+
+            currentYaw += (targetYaw - currentYaw) * 0.12;
+            currentPitch += (targetPitch - currentPitch) * 0.12;
+            camera.rotation.set(currentPitch, currentYaw, 0, 'YXZ');
+
+            playerHandGroup.position.y += (handTargetY - playerHandGroup.position.y) * 0.14;
+            handScrollX += (targetHandScrollX - handScrollX) * 0.15;
+            playerHandGroup.position.x = handScrollX;
+
+            playerCards.forEach(c => {
+                const targetY = c.userData.isSelected ? c.userData.baseY + 0.20 : c.userData.baseY;
+                c.position.y += (targetY - c.position.y) * 0.15;
+            });
+
+            const relTurn = toRelSeat(currentTurn);
+
+            opponents.forEach((opp, i) => {
+                opp.grp.position.y = Q.bob ? (opp.pos[1] + Math.sin(time * 2 + i) * 0.07) : opp.pos[1];
+                if (relTurn === i + 1) {
+                    const glow = Q.pulseGlow ? (1.0 + Math.sin(time * 8) * 0.7) : 1.2;
+                    opp.grp.children.forEach(c => {
+                        if (c.userData.edgeMaterial) {
+                            c.userData.edgeMaterial.emissive.setHex(0x00ff88);
+                            c.userData.edgeMaterial.emissiveIntensity = glow;
+                        }
+                    });
+                }
+            });
+
+            centerSpot.target.position.set(0, 0.42 + placedCardsCount * 0.005, 0);
+
+            for (let i = activeArcs.length - 1; i >= 0; i--) {
+                const anim = activeArcs[i];
+                anim.t += anim.speed;
+                const t = Math.min(anim.t, 1);
+                const p = new THREE.Vector3()
+                    .copy(anim.p0).multiplyScalar((1 - t) * (1 - t))
+                    .add(anim.p1.clone().multiplyScalar(2 * (1 - t) * t))
+                    .add(anim.p2.clone().multiplyScalar(t * t));
+
+                anim.obj.position.copy(p);
+                anim.obj.quaternion.slerp(anim.q1, 0.14);
+                anim.obj.scale.lerp(anim.s1, 0.14);
+
+                if (anim.t >= 1) {
+                    anim.obj.position.copy(anim.p2);
+                    anim.obj.quaternion.copy(anim.q1);
+                    anim.obj.scale.copy(anim.s1);
+                    tableCardMeshes.push(anim.obj);
+                    if (anim.onFinish) anim.onFinish();
+                    activeArcs.splice(i, 1);
+                }
+            }
+
+            updatePlayerTags();
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener("resize", () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        if (!CanvasRenderingContext2D.prototype.roundRect) {
+            CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+                if (typeof r === 'number') r = { tl: r, tr: r, br: r, bl: r };
+                else r = { tl: r || 0, tr: r || 0, br: r || 0, bl: r || 0 };
+                this.beginPath();
+                this.moveTo(x + r.tl, y);
+                this.lineTo(x + w - r.tr, y);
+                this.quadraticCurveTo(x + w, y, x + w, y + r.tr);
+                this.lineTo(x + w, y + h - r.br);
+                this.quadraticCurveTo(x + w, y + h, x + w - r.br, y + h);
+                this.lineTo(x + r.bl, y + h);
+                this.quadraticCurveTo(x, y + h, x, y + h - r.bl);
+                this.lineTo(x, y + r.tl);
+                this.quadraticCurveTo(x, y, x + r.tl, y);
+                this.closePath();
+                return this;
+            };
+        }
+
+        animate();
+        connectWebSocket();
+        console.log("✅ تم تشغيل نظام أونو 3D المحلي بنجاح (WebSockets + LAN)!");
+    </script>
+</body>
+</html>
