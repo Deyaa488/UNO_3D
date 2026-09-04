@@ -87,7 +87,7 @@
             padding: 8px 24px;
             border-radius: 22px;
             pointer-events: none;
-            z-index: 20;
+            z-index: 300;
             backdrop-filter: blur(8px);
             letter-spacing: 0.5px;
             white-space: nowrap;
@@ -253,6 +253,40 @@
             color: #9eb1c7;
             font-size: 13px;
             cursor: pointer;
+        }
+
+        
+        /* Server Config Card in Lobby */
+        .server-config-card {
+            background: rgba(15, 23, 42, 0.9);
+            border: 1.5px solid rgba(255, 255, 255, 0.18);
+            border-radius: 16px;
+            padding: 12px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            text-align: right;
+        }
+        .status-pill {
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 11.5px;
+            font-weight: bold;
+        }
+        .status-pill.online {
+            background: rgba(0, 255, 136, 0.2);
+            color: #00ff88;
+            border: 1px solid rgba(0, 255, 136, 0.4);
+        }
+        .status-pill.offline {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.4);
+        }
+        .status-pill.connecting {
+            background: rgba(245, 158, 11, 0.2);
+            color: #f59e0b;
+            border: 1px solid rgba(245, 158, 11, 0.4);
         }
 
         /* Network Status Badge */
@@ -677,17 +711,20 @@
             <button class="btn-secondary" id="btn-goto-join">🔗 الانضمام إلى غرفة (Join)</button>
             <button class="btn-secondary" id="btn-goto-solo" style="background: linear-gradient(135deg, #4f46e5, #312e81); border-color: rgba(99,102,241,0.5);">🤖 العب وحدك ضد البوتات (Solo)</button>
 
-            <div class="lan-info-box" id="server-ip-info">
+            <div class="server-config-card">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <span>📍 عنوان السيرفر (IP):</span>
-                    <span id="btn-edit-ip" style="color:#00ff88; cursor:pointer; font-size:12px; font-weight:bold;">تعديل ✏️</span>
+                    <span style="font-size:12.5px; font-weight:bold; color:#cbd5e1;">🌐 سيرفر الملتيبلاير (LAN IP):</span>
+                    <span id="server-status-pill" class="status-pill offline">🔴 غير متصل</span>
                 </div>
-                <span class="lan-url" id="server-ip-text">جاري جلب الـ IP...</span>
-                <div id="ip-edit-container" style="display:none; margin-top:6px; flex-direction:column; gap:6px;">
-                    <input type="text" id="input-custom-ip" class="lobby-input" style="font-size:13px; padding:6px 10px;" placeholder="192.168.1.XX:3000">
-                    <button class="btn-primary" id="btn-save-custom-ip" style="padding:8px 12px; font-size:13px;">حفظ وتوصيل</button>
+                <div style="display:flex; gap:8px;">
+                    <input type="text" id="input-server-ip" class="lobby-input" style="text-align:left; direction:ltr; font-family:monospace; font-size:14px; padding:10px;" placeholder="192.168.1.XX:3000">
+                    <button id="btn-test-connect" class="btn-secondary" style="padding:10px 14px; font-size:13px; white-space:nowrap;">فحص ⚡</button>
+                </div>
+                <div id="server-hint-text" style="font-size:11px; color:#94a3b8; line-height:1.4;">
+                    اكتب هنا عنوان IP لجهاز الحاسوب الذي يشغل السيرفر. (للعب الفردي اضغط على الزر البنفسجي أدناه دون الحاجة لسيرفر).
                 </div>
             </div>
+        </div>
         </div>
 
         
@@ -2115,28 +2152,74 @@
         // 7. اتصال السيرفر ومعالجة الرسائل
         // ================================================
         let savedHost = localStorage.getItem('uno_server_host');
-        let activeHost = savedHost || (location.host && !location.host.startsWith('localhost:8080') && location.port ? location.host : 'localhost:3000');
+        // Default host calculation
+        function getDefaultHost() {
+            if (savedHost) return savedHost;
+            if (location.host && !location.host.startsWith('localhost:8080') && location.port && location.protocol !== 'file:') {
+                return location.host;
+            }
+            return '192.168.1.15:3000';
+        }
+        let activeHost = getDefaultHost();
 
-        function connectWebSocket(overrideHost = null) {
+        function updateServerStatusUI(status, text) {
+            const pill = document.getElementById('server-status-pill');
+            if (pill) {
+                pill.className = `status-pill ${status}`;
+                pill.innerText = text;
+            }
+            if (netStatusText) {
+                netStatusText.innerText = text;
+                netDot.className = (status === 'online') ? 'status-dot' : 'status-dot disconnected';
+            }
+        }
+
+        let connectCallbacks = [];
+
+        function connectWebSocket(overrideHost = null, onSuccess = null, onError = null) {
+            if (onSuccess || onError) {
+                connectCallbacks.push({ onSuccess, onError, timeoutId: setTimeout(() => {
+                    if (onError) onError('انتهت مهلة الاتصال (Timeout)');
+                }, 4500) });
+            }
+
             if (overrideHost) {
-                activeHost = overrideHost.replace(/^https?:\/\//, '').replace(/^wss?:\/\//, '');
+                activeHost = overrideHost.replace(/^https?:\/\//, '').replace(/^wss?:\/\//, '').trim();
                 localStorage.setItem('uno_server_host', activeHost);
             }
+
+            const inputIp = document.getElementById('input-server-ip');
+            if (inputIp && inputIp.value !== activeHost) {
+                inputIp.value = activeHost;
+            }
+
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                updateServerStatusUI('online', '🟢 متصل بالسيرفر');
+                flushConnectCallbacks(true);
+                return;
+            }
+
             if (ws) {
                 try { ws.close(); } catch(e) {}
             }
+
             const wsUrl = `ws://${activeHost}`;
+            updateServerStatusUI('connecting', '🟡 جاري الاتصال...');
 
-            netDot.className = "status-dot";
-            netStatusText.innerText = "جاري الاتصال...";
-
-            ws = new WebSocket(wsUrl);
+            try {
+                ws = new WebSocket(wsUrl);
+            } catch (err) {
+                console.warn('WS Init Error:', err);
+                updateServerStatusUI('offline', '🔴 غير متصل');
+                flushConnectCallbacks(false, 'تعذر إنشاء اتصال بالخادم');
+                return;
+            }
 
             ws.onopen = () => {
-                netDot.className = "status-dot";
-                netStatusText.innerText = "متصل بالشبكة";
+                updateServerStatusUI('online', '🟢 متصل بالسيرفر');
+                flushConnectCallbacks(true);
 
-                if (currentRoomCode && mySessionId) {
+                if (currentRoomCode && mySessionId && isMultiplayer) {
                     wsSend({
                         type: 'reconnect',
                         roomCode: currentRoomCode,
@@ -2146,17 +2229,17 @@
             };
 
             ws.onclose = () => {
-                netDot.className = "status-dot disconnected";
-                netStatusText.innerText = "غير متصل (سولو متاح)";
-                // Only retry connecting if in multiplayer or waiting in lobby
-                if (isMultiplayer || (document.getElementById("lobby-overlay") && document.getElementById("lobby-overlay").style.display !== "none")) {
-                    setTimeout(connectWebSocket, 4000);
+                updateServerStatusUI('offline', '🔴 غير متصل');
+                flushConnectCallbacks(false, 'تم إغلاق الاتصال بالسيرفر');
+                if (isMultiplayer && isGameActive) {
+                    setTimeout(() => connectWebSocket(), 4000);
                 }
             };
 
             ws.onerror = (err) => {
-                netDot.className = "status-dot disconnected";
-                netStatusText.innerText = "غير متصل (سولو متاح)";
+                console.warn('WS Connection Error:', err);
+                updateServerStatusUI('offline', '🔴 فشل الاتصال');
+                flushConnectCallbacks(false, 'فشل الاتصال بالسيرفر');
             };
 
             ws.onmessage = (event) => {
@@ -2169,11 +2252,22 @@
             };
         }
 
+        function flushConnectCallbacks(success, errorMsg = '') {
+            while (connectCallbacks.length > 0) {
+                const cb = connectCallbacks.shift();
+                clearTimeout(cb.timeoutId);
+                if (success && cb.onSuccess) cb.onSuccess();
+                else if (!success && cb.onError) cb.onError(errorMsg);
+            }
+        }
+
         function wsSend(payload) {
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify(payload));
             } else {
                 showToast("⚠️ السيرفر غير متصل حالياً");
+                alert(`⚠️ السيرفر غير متصل حالياً على (${activeHost})!
+الرجاء التأكد من تشغيل node server.js على الحاسوب وفحص الـ IP.`);
             }
         }
 
@@ -2636,13 +2730,41 @@
             startSoloGame(soloSelectedSeats);
         });
 
-        document.getElementById('btn-goto-host').addEventListener('click', () => {
+        const btnHost = document.getElementById('btn-goto-host');
+        btnHost.addEventListener('click', () => {
             const nick = getNickname();
-            wsSend({
-                type: 'create_room',
-                nickname: nick,
-                sessionId: mySessionId
-            });
+            const originalText = btnHost.innerText;
+            btnHost.innerText = "جاري الاتصال بالسيرفر... ⏳";
+            btnHost.disabled = true;
+
+            function proceed() {
+                btnHost.innerText = originalText;
+                btnHost.disabled = false;
+                wsSend({
+                    type: 'create_room',
+                    nickname: nick,
+                    sessionId: mySessionId
+                });
+            }
+
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                proceed();
+            } else {
+                const ipInput = document.getElementById('input-server-ip').value.trim() || activeHost;
+                connectWebSocket(ipInput, () => {
+                    proceed();
+                }, (err) => {
+                    btnHost.innerText = originalText;
+                    btnHost.disabled = false;
+                    alert(`❌ تعذر الاتصال بالسيرفر على: (${activeHost})
+
+1. هل قمت بتشغيل السيرفر على الحاسوب بأمر node server.js؟
+2. هل الهاتف والحاسوب متصلان بنفس شبكة الواي فاي؟
+3. هل عنوان الـ IP صحيح؟ تأكد من كتابته مثل: 192.168.1.XX:3000
+
+💡 يمكنك أيضاً الضغط على الزر البنفسجي (العب ضد البوتات) للعب فوراً بدون سيرفر.`);
+                });
+            }
         });
 
         document.getElementById('btn-goto-join').addEventListener('click', () => {
